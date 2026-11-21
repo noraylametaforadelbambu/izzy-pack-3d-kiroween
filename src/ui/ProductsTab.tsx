@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { MAX_TYPES, type TypeRow } from '../core/boxTypes'
 import { CSV_MAX_UNITS, TEMPLATE_FILENAME, productsTemplate, type CsvResult } from '../core/csv'
 import type { TypeSummary } from '../core/layout'
@@ -28,6 +28,11 @@ interface Props {
   onDeleteType: (id: string) => void
   csv: CsvState | null
   onCsvFile: (file: File) => void
+  /** "Try a sample order": loads three example products (asks first when the current order was edited). */
+  onTrySample: () => void
+  confirmSample: boolean
+  onConfirmSample: () => void
+  onCancelSample: () => void
   onCsvApply: () => void
   onCsvCancel: () => void
 }
@@ -57,6 +62,11 @@ function downloadTemplate(unit: Unit, weightUnit: WeightUnit): void {
 /** The product list (name, size, quantity, weight), with CSV import. Everything is stored in mm and grams. */
 export function ProductsTab(p: Props) {
   const fileInput = useRef<HTMLInputElement>(null)
+  const confirmBox = useRef<HTMLDivElement>(null)
+  // When the question opens, bring it into view (on phones it appears below the fold, above the sticky Optimize bar).
+  useEffect(() => {
+    if (p.confirmSample) confirmBox.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [p.confirmSample])
   const { unit, weightUnit } = p
   return (
     <div className="productstab">
@@ -168,6 +178,25 @@ export function ProductsTab(p: Props) {
           }}
         />
       </div>
+      <div className="psample">
+        <button type="button" className="add sample" onClick={p.onTrySample} disabled={p.busy} title="Load three example Halloween products: skull masks, black candles and jack-o’-lanterns">
+          Try a sample order
+        </button>
+      </div>
+      {p.confirmSample && (
+        <div ref={confirmBox} className="csvbox samplebox" role="group" aria-label="Replace your products with the sample order?" data-testid="sample-confirm">
+          <b>Replace your products with the sample order?</b>
+          <p>You changed the current products. Loading the sample replaces them, and your edits are lost. Results and boxes stay as they are until you press Optimize or Recommend box.</p>
+          <div className="pactions">
+            <button type="button" className="add" onClick={p.onConfirmSample}>
+              Replace with sample
+            </button>
+            <button type="button" className="add" onClick={p.onCancelSample} autoFocus>
+              Keep my products
+            </button>
+          </div>
+        </div>
+      )}
       <p className="hint csvhint">
         CSV columns: <code>name, length_{unit}, width_{unit}, height_{unit}, quantity, weight_{weightUnit}</code> (weight is optional). Up to {MAX_TYPES} products and{' '}
         {CSV_MAX_UNITS.toLocaleString('en-US')} units. The file is read on this computer only.

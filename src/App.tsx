@@ -35,6 +35,8 @@ import {
   type Recommendation,
 } from './core/catalog'
 import { CSV_MAX_BYTES, parseProductsCsv } from './core/csv'
+import type { PictogramKind } from './core/pictogram'
+import { isUntouchedOrder, orderSignature, rowsFromSample } from './core/sampleOrder'
 import { canRedo, canUndo, commit, createHistory, redo, undo, type History } from './core/history'
 import { layoutFromPlacements, type Placement } from './core/layout'
 import { MANUAL_MAX_BOXES, addBox, moveBy, removeBox, resolveDrop, rotate, type Axis, type Change } from './core/manual'
@@ -72,7 +74,12 @@ interface Config {
   weight: WeightSpec
   /** Name and color of each product when the layout was made, so the report still reads well after the list is replaced. */
   labels: Record<string, { name: string; color: string }>
+  /** Pictogram of the products that have one (the sample order). Empty for ordinary orders. */
+  pictograms: Record<string, PictogramKind>
 }
+
+const snapshotPictograms = (rows: TypeRow[]): Config['pictograms'] =>
+  Object.fromEntries(rows.flatMap((r) => (r.pictogram ? [[r.id, r.pictogram] as const] : [])))
 
 const snapshotLabels = (rows: TypeRow[]): Config['labels'] => Object.fromEntries(rows.map((r, i) => [r.id, { name: rowLabel(r, i), color: r.color }]))
 
@@ -85,7 +92,7 @@ export default function App() {
   const [rows, setRows] = useState<TypeRow[]>(sampleRows)
   const [config, setConfig] = useState<Config>(() => {
     const v = validateRows(rows)
-    return { box: SAMPLE_BOX, types: 'types' in v ? v.types : [], weight: { emptyG: 0, maxG: null }, labels: snapshotLabels(rows) }
+    return { box: SAMPLE_BOX, types: 'types' in v ? v.types : [], weight: { emptyG: 0, maxG: null }, labels: snapshotLabels(rows), pictograms: snapshotPictograms(rows) }
   })
   const [wUnit, setWUnit] = useState<WeightUnit>('kg')
   const [emptyW, setEmptyW] = useState<WField>(blankW)
@@ -110,6 +117,9 @@ export default function App() {
   // The four sections. All of them stay mounted, so switching tabs never loses state.
   const [tab, setTab] = useState<TabId>('products')
   const [csv, setCsv] = useState<CsvState | null>(null)
+  const [confirmSample, setConfirmSample] = useState(false)
+  // The order the app starts with: replacing it (or the untouched sample) needs no confirmation.
+  const startSignature = useRef(orderSignature(sampleRows()))
   // Halloween mode: colors of the 3D view only. Off by default and not saved; nothing else reads it.
   const [halloween, setHalloween] = useState(false)
   const viewer = useRef<ViewerHandle>(null)
@@ -192,6 +202,25 @@ export default function App() {
     setCsv(null)
     edited()
     notify(`Imported ${imported.length} ${imported.length === 1 ? 'product' : 'products'}. Press Optimize to pack them.`, 'info')
+  }
+
+  // ---- "Try a sample order": same path as a CSV import --------------------------------
+
+  function loadSample() {
+    const sample = rowsFromSample(unit, wUnit)
+    const old = new Set(rows.map((r) => r.id))
+    setRows(sample)
+    setInvalid((s) => new Set([...s].filter((k) => !old.has(k.split('.')[0]))))
+    setCsv(null)
+    setConfirmSample(false)
+    edited()
+    notify('Sample order loaded: 3 Halloween products. Open Boxes and press Recommend box.', 'info')
+  }
+
+  function onTrySample() {
+    setCsv(null) // a pending CSV preview would be replaced too
+    if (isUntouchedOrder(rows, startSignature.current)) loadSample()
+    else setConfirmSample(true) // the user edited the order: ask first
   }
 
   function onAddType() {
@@ -327,7 +356,7 @@ export default function App() {
     if (!rec || !r || r.status !== 'found' || !r.box || !r.result) return
     const dims = r.box.dims
     setBox(dimsToFields(dims, unit))
-    setConfig({ box: dims, types: rec.types, weight: rec.spec, labels: snapshotLabels(rows) })
+    setConfig({ box: dims, types: rec.types, weight: rec.spec, labels: snapshotLabels(rows), pictograms: snapshotPictograms(rows) })
     setOpt(r.result)
     setHist(createHistory<Placement[]>([]))
     setSelectedId(null)
@@ -360,7 +389,7 @@ export default function App() {
         return
       }
       setOpt(result)
-      setConfig({ box: b.dims, types: v.types, weight: spec, labels: snapshotLabels(rows) })
+      setConfig({ box: b.dims, types: v.types, weight: spec, labels: snapshotLabels(rows), pictograms: snapshotPictograms(rows) })
       setHist(createHistory<Placement[]>([]))
       setSelectedId(null)
       setStale(editVersion.current !== version) // inputs edited while it ran are not part of this result
@@ -496,7 +525,7 @@ export default function App() {
   return (
     <main className="app">
       <section className="stage">
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} />
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} />
         {halloween && <HalloweenDecor />}
         <Toolbar
           mode={mode}
@@ -587,6 +616,10 @@ export default function App() {
                 onCsvFile={(f) => void onCsvFile(f)}
                 onCsvApply={onCsvApply}
                 onCsvCancel={() => setCsv(null)}
+                onTrySample={onTrySample}
+                confirmSample={confirmSample}
+                onConfirmSample={loadSample}
+                onCancelSample={() => setConfirmSample(false)}
               />
             </div>
             <div id="panel-boxes" role="tabpanel" aria-labelledby="tab-boxes" hidden={tab !== 'boxes'}>

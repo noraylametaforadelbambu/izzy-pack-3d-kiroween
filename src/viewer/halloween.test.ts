@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SCENE, HALLOWEEN_PALETTE, HALLOWEEN_SCENE, halloweenColor } from './halloween'
 
 describe('Halloween palette', () => {
-  it('uses orange, purple and green, one per product type', () => {
-    expect(HALLOWEEN_PALETTE).toEqual(['#ff8a1f', '#a35bff', '#38e07b'])
+  it('uses bone white, lavender and pumpkin orange, one per product type', () => {
+    expect(HALLOWEEN_PALETTE).toEqual(['#f2e8d5', '#a35bff', '#f97316'])
     expect([0, 1, 2].map((i) => halloweenColor(i).hex)).toEqual([...HALLOWEEN_PALETTE])
     expect(new Set([0, 1, 2].map((i) => halloweenColor(i).hex)).size).toBe(3)
     expect([0, 1, 2].every((i) => halloweenColor(i).tint === 0)).toBe(true)
   })
   it('repeats with a lighter tint on every second round, so neighbours stay distinguishable', () => {
-    expect(halloweenColor(3)).toEqual({ hex: '#ff8a1f', tint: 0.14 })
-    expect(halloweenColor(5)).toEqual({ hex: '#38e07b', tint: 0.14 })
-    expect(halloweenColor(6)).toEqual({ hex: '#ff8a1f', tint: 0 })
+    expect(halloweenColor(3)).toEqual({ hex: '#f2e8d5', tint: 0.14 })
+    expect(halloweenColor(5)).toEqual({ hex: '#f97316', tint: 0.14 })
+    expect(halloweenColor(6)).toEqual({ hex: '#f2e8d5', tint: 0 })
     const firstEight = Array.from({ length: 8 }, (_, i) => halloweenColor(i))
     const keys = firstEight.map((c) => `${c.hex}/${c.tint}`)
     expect(new Set(keys).size).toBe(6) // six different looks before the cycle starts over

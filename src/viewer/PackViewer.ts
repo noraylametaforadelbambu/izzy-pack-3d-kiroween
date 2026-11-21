@@ -2,6 +2,7 @@ import {
   AmbientLight,
   BoxGeometry,
   BufferGeometry,
+  CanvasTexture,
   Color,
   DirectionalLight,
   EdgesGeometry,
@@ -17,15 +18,21 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Plane,
+  PlaneGeometry,
+  Quaternion,
   Raycaster,
   Scene,
+  SRGBColorSpace,
   Vector2,
   Vector3,
   WebGLRenderer,
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { Layout, Placement } from '../core/layout'
+import type { PictogramKind } from '../core/pictogram'
+import { planDecals } from './decals'
 import { DEFAULT_SCENE, HALLOWEEN_SCENE, halloweenColor } from './halloween'
+import { drawPictogram } from './pictograms'
 
 /** Longest box side in scene units. Keeps the camera framing independent of mm / in. */
 const SCENE_SIZE = 10
@@ -35,6 +42,13 @@ export const MAX_RENDERED = 20000
 const MAX_OUTLINED = 3000
 
 const DEFAULT_DIR = new Vector3(1, 0.75, 1.15).normalize()
+/** Boxes are drawn a little smaller than their cell so neighbours show a thin gap. */
+const ITEM_GAP = 0.97
+/** Pictograms sit this far (scene units) in front of the face: inside the gap, so they never cut into a neighbour. */
+const DECAL_LIFT = 0.006
+const Q_RIGHT = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2)
+// top face: lie flat, with the top of the icon pointing away from the default camera
+const Q_TOP = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 4).multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2))
 /** Pointer travel (px) before a press on a box turns into a drag. */
 const DRAG_THRESHOLD = 4
 
@@ -113,6 +127,9 @@ export class PackViewer {
   private mesh: InstancedMesh | null = null
   private list: Placement[] = []
   private halloween = false
+  /** One material (and so one texture) per pictogram kind, created on first use and reused by every box of that kind. */
+  private decalMaterials = new Map<PictogramKind, MeshBasicMaterial>()
+  private lastDrawCalls = -1
   /** Position of each product type in the list, used by the Halloween palette. */
   private typeIndex = new Map<string, number>()
   private dims = { k: 1, bx: 1, by: 1, bz: 1, h: 1 }
@@ -300,7 +317,7 @@ export class PackViewer {
    * Layout coordinates are x = length, y = width, z = height (up). Three.js uses
    * y as up, so this is the single place where width and height are swapped.
    */
-  setLayout(layout: Layout): void {
+  setLayout(layout: Layout, pictograms?: Readonly<Record<string, PictogramKind>>): void {
     this.clear()
     const { box } = layout
     this.renderer.domElement.setAttribute('aria-label', `3D view: ${layout.placedCount} ${layout.placedCount === 1 ? 'box' : 'boxes'} placed in a container of ${box.l} × ${box.w} × ${box.h} mm. Drag to rotate, scroll to zoom.`)
@@ -326,7 +343,7 @@ export class PackViewer {
     this.list = list
     this.typeIndex = new Map(layout.types.map((t, i) => [t.typeId, i]))
     if (list.length > 0) {
-      const gap = 0.97
+      const gap = ITEM_GAP
       const mesh = new InstancedMesh(
         new BoxGeometry(1, 1, 1),
         this.itemMaterial,
@@ -372,10 +389,73 @@ export class PackViewer {
       }
     }
     // Lets tests and users' tools confirm what the scene currently shows.
+    this.buildDecals(list, pictograms)
     this.container.dataset.instances = String(list.length)
     this.container.dataset.expected = String(layout.placedCount)
     this.publishTheme()
     this.updateSelection()
+  }
+
+  /** Material with the pictogram texture of one kind. Drawn once; null when canvas is not available. */
+  private decalMaterial(kind: PictogramKind): MeshBasicMaterial | null {
+    const cached = this.decalMaterials.get(kind)
+    if (cached) return cached
+    const canvas = document.createElement('canvas')
+    canvas.width = canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    drawPictogram(ctx, kind, 128)
+    const texture = new CanvasTexture(canvas)
+    texture.colorSpace = SRGBColorSpace
+    const material = new MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
+    this.decalMaterials.set(kind, material)
+    return material
+  }
+
+  /**
+   * Pictograms for products that have one (the sample order). One instanced plane per kind, so a whole order costs at most
+   * three extra draw calls. Nothing is added when no product has a pictogram: ordinary orders render exactly as before.
+   */
+  private buildDecals(list: Placement[], pictograms?: Readonly<Record<string, PictogramKind>>): void {
+    const counts: Record<string, number> = {}
+    if (pictograms && Object.keys(pictograms).length > 0 && list.length > 0) {
+      const decals = planDecals(list, (id) => pictograms[id])
+      const { k, bx, by, bz } = this.dims
+      const byKind = new Map<PictogramKind, typeof decals>()
+      for (const d of decals) byKind.set(d.kind, [...(byKind.get(d.kind) ?? []), d])
+      const m = new Matrix4()
+      const pos = new Vector3()
+      const one = new Vector3()
+      for (const [kind, ds] of byKind) {
+        const material = this.decalMaterial(kind)
+        if (!material) continue
+        const mesh = new InstancedMesh(new PlaneGeometry(1, 1), material, ds.length)
+        ds.forEach((d, i) => {
+          const p = list[d.index]
+          pos.set(-bx / 2 + (p.x + p.size.l / 2) * k, -by / 2 + (p.z + p.size.h / 2) * k, -bz / 2 + (p.y + p.size.w / 2) * k)
+          let q: Quaternion = new Quaternion()
+          if (d.face === 'front') pos.z += (p.size.w * k * ITEM_GAP) / 2 + DECAL_LIFT
+          else if (d.face === 'right') {
+            pos.x += (p.size.l * k * ITEM_GAP) / 2 + DECAL_LIFT
+            q = Q_RIGHT
+          } else {
+            pos.y += (p.size.h * k * ITEM_GAP) / 2 + DECAL_LIFT
+            q = Q_TOP
+          }
+          const side = d.size * k * ITEM_GAP
+          m.compose(pos, q, one.set(side, side, 1))
+          mesh.setMatrixAt(i, m)
+        })
+        mesh.instanceMatrix.needsUpdate = true
+        mesh.frustumCulled = false
+        mesh.renderOrder = 4 // after the boxes, whose depth keeps hidden pictograms hidden
+        this.content.add(mesh)
+        counts[kind] = ds.length
+      }
+    }
+    // Test hooks: how many pictograms of each kind, and how many textures exist (at most one per kind).
+    this.container.dataset.decals = JSON.stringify(counts)
+    this.container.dataset.decalTextures = String(this.decalMaterials.size)
   }
 
   /** Color of one box: its own color, or (Halloween mode) the palette color of its type; plus the same height shading. */
@@ -481,5 +561,10 @@ export class PackViewer {
     this.frame = requestAnimationFrame(this.loop)
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
+    const calls = this.renderer.info.render.calls
+    if (calls !== this.lastDrawCalls) {
+      this.lastDrawCalls = calls
+      this.container.dataset.drawCalls = String(calls) // test hook
+    }
   }
 }

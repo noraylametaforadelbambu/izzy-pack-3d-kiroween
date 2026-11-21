@@ -1,4 +1,5 @@
 import type { CsvProduct } from './csv'
+import type { PictogramKind } from './pictogram'
 import { dimsToFields, editField, switchFields, validateFields, type DimsFields } from './fields'
 import type { PackItem } from './optimizer'
 import type { Dims } from './pack'
@@ -31,6 +32,8 @@ export interface TypeRow {
   qty: string
   /** Weight of one unit. Blank means unspecified (no weight limit from this type). */
   weight: WField
+  /** Pictogram shown on this product's boxes in the 3D view. Only the sample order's products have one. */
+  pictogram?: PictogramKind
 }
 
 let seq = 0
@@ -46,7 +49,7 @@ export function nextColor(rows: TypeRow[]): string {
 
 /** A new row that starts with the same dimensions as `from`, a small quantity, and a fresh color. */
 export function cloneRow(from: TypeRow, color: string): TypeRow {
-  return { ...from, id: `t${++seq}`, name: '', color, qty: '5' }
+  return { ...from, id: `t${++seq}`, name: '', color, qty: '5', pictogram: undefined }
 }
 
 export function editRowField(r: TypeRow, field: keyof Dims | 'qty', text: string, unit: Unit): TypeRow {

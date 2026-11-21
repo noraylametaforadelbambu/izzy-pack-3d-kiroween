@@ -1,9 +1,9 @@
 /**
  * Halloween mode: a purely visual theme for the 3D view. Same boxes, same geometry; only colors change.
- * High-contrast orange, purple and green, one per product type in list order. With more than three types the
+ * High-contrast bone white, lavender and pumpkin orange, one per product type in list order. With more than three types the
  * colors repeat, and every second repeat is a lighter tint so neighbouring types can still be told apart.
  */
-export const HALLOWEEN_PALETTE = ['#ff8a1f', '#a35bff', '#38e07b'] as const
+export const HALLOWEEN_PALETTE = ['#f2e8d5', '#a35bff', '#f97316'] as const
 
 /** Lightness added to the repeats (types 4, 5, 6 ... get a lighter tint, types 7, 8, 9 the base color again). */
 const TINT = 0.14

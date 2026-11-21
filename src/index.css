@@ -1284,3 +1284,38 @@ input.bad {
     bottom: 12px;
   }
 }
+
+/* Try a sample order */
+.psample {
+  margin-top: 6px;
+}
+.psample .add.sample {
+  width: 100%;
+  border-color: #6b4a1f;
+  color: #ffd9b0;
+}
+.samplebox {
+  border-color: #8f6b3b;
+  background: rgba(246, 173, 85, 0.1);
+}
+
+/* On phones the page scrolls below the viewer: keep messages (toasts) on screen instead of at the top of the viewer */
+@media (max-width: 767px) {
+  .toast {
+    position: fixed;
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    max-width: none;
+    text-align: center;
+  }
+}
+
+@media (max-width: 767px) {
+  /* the Optimize bar is sticky at the bottom: scrolling to a field or message must stop above it */
+  html,
+  .app {
+    scroll-padding-bottom: 96px;
+  }
+}

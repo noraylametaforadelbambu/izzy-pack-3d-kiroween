@@ -139,3 +139,10 @@ Box recommendation from a catalog, kg/lb and cm in the UI, tabbed UI, Web Worker
 3. Count-oriented candidates (smallest types first) are tried when the layered patterns do not complete the order.
 4. This is a heuristic and no optimality is claimed. The trade-off (more pieces, less volume) is measured in `docs/optimizer-benchmark.md`.
 5. Out of scope: several boxes per order.
+
+### R17. Try a sample order
+1. Products has a **Try a sample order** button. It loads three Halloween products (skull masks, black candles, jack-o’-lanterns) with different sizes, quantities and weights, through the same path as a CSV import (units, validation and limits are the same).
+2. If the current products were edited or imported, a confirmation is shown first ("Keep my products" has the focus); the untouched start-up order and the untouched sample are replaced without asking. A pending CSV preview is closed.
+3. Loading the sample changes only the products. It does not run Optimize, change the container, catalog, weights limits, units, results or the Auto / Manual mode.
+4. The sample is recommended a box from the example catalog (Boxes -> Recommend box), can be used (Use this box), shown in 3D and reported (Report).
+5. In the 3D view each box of the sample order shows a pictogram (skull, black candle or jack-o’-lantern, by product; bone white, black, lavender, orange and brown only: no gold, no green, no ornaments) on one exterior face that the default camera sees: front, right or top. A face is exterior when no other box touches the icon area; the face with the largest icon wins. Boxes completely surrounded by others cannot show one. Textures and materials are created once per product type (three in total) and drawn as one instanced mesh per type (at most three extra draw calls). Boxes, sizes, layout, statistics, selection and camera are unchanged. Ordinary orders (typed, imported or edited into other products) have no pictograms and render exactly as before.

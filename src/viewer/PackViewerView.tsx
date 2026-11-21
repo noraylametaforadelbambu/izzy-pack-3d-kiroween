@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Layout } from '../core/layout'
+import type { PictogramKind } from '../core/pictogram'
 import { PackViewer, type Interaction } from './PackViewer'
 
 export interface ViewerHandle {
@@ -11,10 +12,12 @@ interface Props {
   interaction: Interaction
   /** Halloween color theme (visual only). */
   halloween: boolean
+  /** Pictogram of each product type that has one (the sample order). Empty for ordinary orders. */
+  pictograms: Readonly<Record<string, PictogramKind>>
 }
 
 export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewerView(
-  { layout, interaction, halloween },
+  { layout, interaction, halloween, pictograms },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null)
@@ -23,12 +26,14 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
   latest.current = layout
   const theme = useRef(halloween)
   theme.current = halloween
+  const pics = useRef(pictograms)
+  pics.current = pictograms
 
   useEffect(() => {
     const v = new PackViewer(host.current!)
     viewer.current = v
     v.setHalloween(theme.current)
-    v.setLayout(latest.current)
+    v.setLayout(latest.current, pics.current)
     return () => {
       v.dispose()
       viewer.current = null
@@ -36,8 +41,8 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
   }, [])
 
   useEffect(() => {
-    viewer.current?.setLayout(layout)
-  }, [layout])
+    viewer.current?.setLayout(layout, pictograms)
+  }, [layout, pictograms])
 
   useEffect(() => {
     viewer.current?.setHalloween(halloween)
