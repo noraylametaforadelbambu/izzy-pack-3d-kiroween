@@ -1,0 +1,653 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  MAX_TYPES,
+  cloneRow,
+  editRowField,
+  editRowWeight,
+  rowLabel,
+  rowsFromProducts,
+  switchRowWeight,
+  newRow,
+  nextColor,
+  PALETTE,
+  switchRow,
+  validateRows,
+  type TypeRow,
+} from './core/boxTypes'
+import {
+  dimsToFields,
+  editField,
+  fieldFromMm,
+  switchField,
+  switchFields,
+  validateFields,
+  type DimsFields,
+  type Field,
+} from './core/fields'
+import {
+  EXAMPLE_BOXES,
+  editCatalogRow,
+  newCatalogRow,
+  recommendBox,
+  switchCatalogRow,
+  validateCatalog,
+  type CatalogRow,
+  type Recommendation,
+} from './core/catalog'
+import { CSV_MAX_BYTES, parseProductsCsv } from './core/csv'
+import { canRedo, canUndo, commit, createHistory, redo, undo, type History } from './core/history'
+import { layoutFromPlacements, type Placement } from './core/layout'
+import { MANUAL_MAX_BOXES, addBox, moveBy, removeBox, resolveDrop, rotate, type Axis, type Change } from './core/manual'
+import type { PackItem } from './core/optimizer'
+import { optimizeWeighted, type WeightedResult } from './core/weighted'
+import type { OptimizeProgress } from './core/optimizer'
+import { blankW, editW, switchW, weightOf, type WeightSpec, type WeightUnit, type WField } from './core/weight'
+import { SAMPLE_BOX, SAMPLE_ITEM, type Dims } from './core/pack'
+import type { Unit } from './core/units'
+import { BoxesTab } from './ui/BoxesTab'
+import { CatalogPanel } from './ui/CatalogPanel'
+import { ProductsTab, type CsvState } from './ui/ProductsTab'
+import { ReportTab } from './ui/ReportTab'
+import { Tabs, type TabId } from './ui/Tabs'
+import { UnitsBar } from './ui/UnitsBar'
+import { JobStatus } from './ui/JobStatus'
+import { Results } from './ui/Results'
+import { SelectionCard } from './ui/SelectionCard'
+import { Toolbar, type Mode } from './ui/Toolbar'
+import type { Interaction } from './viewer/PackViewer'
+import { createOptimizerWorker } from './worker/createWorker'
+import { JobCancelledError, OptimizerRunner } from './worker/jobs'
+import { PackViewerView, type ViewerHandle } from './viewer/PackViewerView'
+
+/** Sample start: one box type, "as many as fit" (blank quantity). */
+function sampleRows(): TypeRow[] {
+  return [newRow(SAMPLE_ITEM, '', PALETTE[0], 'mm')]
+}
+
+/** The box and box types the layouts are built from (set by Optimize / Apply). */
+interface Config {
+  box: Dims
+  types: PackItem[]
+  weight: WeightSpec
+  /** Name and color of each product when the layout was made, so the report still reads well after the list is replaced. */
+  labels: Record<string, { name: string; color: string }>
+}
+
+const snapshotLabels = (rows: TypeRow[]): Config['labels'] => Object.fromEntries(rows.map((r, i) => [r.id, { name: rowLabel(r, i), color: r.color }]))
+
+const DEFAULT_STEP_MM = 10
+const TAB_ORDER: TabId[] = ['products', 'boxes', 'result', 'report']
+
+export default function App() {
+  const [unit, setUnit] = useState<Unit>('mm')
+  const [box, setBox] = useState<DimsFields>(() => dimsToFields(SAMPLE_BOX, 'mm'))
+  const [rows, setRows] = useState<TypeRow[]>(sampleRows)
+  const [config, setConfig] = useState<Config>(() => {
+    const v = validateRows(rows)
+    return { box: SAMPLE_BOX, types: 'types' in v ? v.types : [], weight: { emptyG: 0, maxG: null }, labels: snapshotLabels(rows) }
+  })
+  const [wUnit, setWUnit] = useState<WeightUnit>('kg')
+  const [emptyW, setEmptyW] = useState<WField>(blankW)
+  const [maxW, setMaxW] = useState<WField>(blankW)
+  // Automatic layout from the weight-aware optimizer (a heuristic: best found, not proven optimal).
+  const [opt, setOpt] = useState<WeightedResult>(() => optimizeWeighted(config.box, config.types, config.weight))
+  const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set())
+  const [stale, setStale] = useState(false)
+  const [mode, setMode] = useState<Mode>('auto')
+  const [hist, setHist] = useState<History<Placement[]>>(() => createHistory<Placement[]>([]))
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [step, setStep] = useState<Field>(() => fieldFromMm(DEFAULT_STEP_MM, 'mm'))
+  const [notice, setNotice] = useState<{ text: string; tone: 'error' | 'info' } | null>(null)
+  const noticeTimer = useRef<number>(0)
+  // Optimization runs in a Web Worker, one job at a time. `job` is set while it runs.
+  const runner = useRef<OptimizerRunner | null>(null)
+  const [job, setJob] = useState<{ kind: 'optimize' | 'recommend'; progress: OptimizeProgress | null } | null>(null)
+  // Shipping-box catalog (interior sizes) and the latest recommendation for the current inputs.
+  const [catalog, setCatalog] = useState<CatalogRow[]>(() => EXAMPLE_BOXES.map((d) => newCatalogRow(d, 'mm')))
+  const [rec, setRec] = useState<{ recommendation: Recommendation; types: PackItem[]; spec: WeightSpec } | null>(null)
+  const editVersion = useRef(0)
+  // The four sections. All of them stay mounted, so switching tabs never loses state.
+  const [tab, setTab] = useState<TabId>('products')
+  const [csv, setCsv] = useState<CsvState | null>(null)
+  const viewer = useRef<ViewerHandle>(null)
+
+  const manual = mode === 'manual'
+  const typeNumbers = useMemo(() => new Map(rows.map((r, i) => [r.id, i + 1])), [rows])
+  const autoLayout = opt.layout
+  const manualLayout = useMemo(
+    () => layoutFromPlacements(config.box, config.types, hist.present),
+    [config, hist.present],
+  )
+  const layout = manual ? manualLayout : autoLayout
+  const summaries = useMemo(() => new Map(layout.types.map((t) => [t.typeId, t])), [layout])
+  const weight = useMemo(
+    () => weightOf(layout.placements, new Map(config.types.map((t) => [t.id, (t.weightKg ?? 0) * 1000])), config.weight),
+    [layout, config],
+  )
+  const selected = manual ? hist.present.find((p) => p.id === selectedId) : undefined
+
+  function notify(text: string, tone: 'error' | 'info' = 'error') {
+    setNotice({ text, tone })
+    window.clearTimeout(noticeTimer.current)
+    noticeTimer.current = window.setTimeout(() => setNotice(null), 2800)
+  }
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), [])
+  useEffect(() => () => runner.current?.cancel(), [])
+
+  /** Marks the inputs as changed since the last optimization. */
+  function edited() {
+    editVersion.current++
+    setStale(true)
+    setRec(null) // a recommendation belongs to the inputs it was made for
+  }
+
+  function clearInvalid(key: string) {
+    setInvalid((s) => {
+      if (!s.has(key)) return s
+      const n = new Set(s)
+      n.delete(key)
+      return n
+    })
+  }
+
+  // ---- Container and box types -------------------------------------------------
+
+  function onEditBox(key: keyof Dims, text: string) {
+    setBox((b) => ({ ...b, [key]: editField(text, unit) }))
+    clearInvalid(`box.${key}`)
+    edited()
+  }
+
+  function onEditType(id: string, field: keyof Dims | 'qty', text: string) {
+    setRows((rs) => rs.map((r) => (r.id === id ? editRowField(r, field, text, unit) : r)))
+    clearInvalid(`${id}.${field}`)
+    edited()
+  }
+
+  function onEditName(id: string, text: string) {
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, name: text } : r))) // cosmetic: no new optimization needed
+  }
+
+  // ---- CSV import: validate first, change the order only when the user confirms -----
+
+  async function onCsvFile(file: File) {
+    const fail = (message: string) => setCsv({ fileName: file.name, result: { ok: false, errors: [{ row: null, column: null, message }], truncated: false } })
+    if (file.size > CSV_MAX_BYTES) return fail(`The file is too large (limit ${CSV_MAX_BYTES / 1024} KB)`)
+    try {
+      setCsv({ fileName: file.name, result: parseProductsCsv(await file.text()) })
+    } catch {
+      fail('The file could not be read')
+    }
+  }
+
+  function onCsvApply() {
+    if (!csv || !csv.result.ok) return
+    const imported = rowsFromProducts(csv.result.products, unit, wUnit)
+    const old = new Set(rows.map((r) => r.id))
+    setRows(imported)
+    setInvalid((s) => new Set([...s].filter((k) => !old.has(k.split('.')[0]))))
+    setCsv(null)
+    edited()
+    notify(`Imported ${imported.length} ${imported.length === 1 ? 'product' : 'products'}. Press Optimize to pack them.`, 'info')
+  }
+
+  function onAddType() {
+    if (rows.length >= MAX_TYPES) return
+    // A new type starts as a copy of the last one, so it is valid in the current unit.
+    setRows((rs) => [...rs, cloneRow(rs[rs.length - 1], nextColor(rs))])
+    edited()
+  }
+
+  function onDeleteType(id: string) {
+    if (rows.length <= 1) return
+    setRows((rs) => rs.filter((r) => r.id !== id))
+    setInvalid((s) => new Set([...s].filter((k) => !k.startsWith(`${id}.`))))
+    edited()
+  }
+
+  function onUnit(u: Unit) {
+    if (u === unit) return
+    setUnit(u)
+    setBox((b) => switchFields(b, u))
+    setRows((rs) => rs.map((r) => switchRow(r, u)))
+    setCatalog((cs) => cs.map((c) => switchCatalogRow(c, u)))
+    setStep((s) => switchField(s, u))
+  }
+
+  function onEditWeight(key: string, text: string) {
+    const f = editW(text, wUnit)
+    if (key === 'empty') setEmptyW(f)
+    else if (key === 'max') setMaxW(f)
+    else setRows((rs) => rs.map((r) => (r.id === key ? editRowWeight(r, text, wUnit) : r)))
+    clearInvalid(key === 'empty' ? 'w.empty' : key === 'max' ? 'w.max' : `${key}.wt`)
+    edited()
+  }
+
+  function onWeightUnit(u: WeightUnit) {
+    if (u === wUnit) return
+    setWUnit(u)
+    setEmptyW((f) => switchW(f, u))
+    setMaxW((f) => switchW(f, u))
+    setRows((rs) => rs.map((r) => switchRowWeight(r, u)))
+  }
+
+  /** The section a highlighted field belongs to. */
+  function tabOfKey(key: string): TabId {
+    if (key.startsWith('box.') || key.startsWith('w.')) return 'boxes'
+    return rows.some((r) => r.id === key.split('.')[0]) ? 'products' : 'boxes' // catalog rows are in Boxes
+  }
+
+  /** Opens the first section that has a field to fix, so the highlighted field is not hidden in another tab. */
+  function showFirstProblem(bad: ReadonlySet<string>) {
+    const first = [...bad].map(tabOfKey).sort((a, b) => TAB_ORDER.indexOf(a) - TAB_ORDER.indexOf(b))[0]
+    if (first) setTab(first)
+  }
+
+  /** Weight settings as grams; flags invalid fields in `bad`. The maximum must be above the empty box weight. */
+  function readSpec(bad: Set<string>): WeightSpec {
+    if (!emptyW.valid) bad.add('w.empty')
+    if (!maxW.valid) bad.add('w.max')
+    const spec: WeightSpec = { emptyG: emptyW.g ?? 0, maxG: maxW.g }
+    if (bad.size === 0 && spec.maxG !== null && spec.maxG <= spec.emptyG) {
+      bad.add('w.max')
+      notify('Max gross weight must be above the empty box weight')
+    }
+    return spec
+  }
+
+  // ---- Shipping-box catalog ----------------------------------------------------
+
+  function onEditCatalog(id: string, key: keyof Dims, text: string) {
+    setCatalog((cs) => cs.map((c) => (c.id === id ? editCatalogRow(c, key, text, unit) : c)))
+    clearInvalid(`${id}.${key}`)
+    setRec(null)
+  }
+
+  function onAddCatalog() {
+    setCatalog((cs) => [...cs, newCatalogRow({ l: 300, w: 200, h: 150 }, unit)])
+    setRec(null)
+  }
+
+  function onRemoveCatalog(id: string) {
+    setCatalog((cs) => cs.filter((c) => c.id !== id))
+    setInvalid((s) => new Set([...s].filter((k) => !k.startsWith(`${id}.`))))
+    setRec(null)
+  }
+
+  /** Smallest catalog box that holds the whole order (explicit quantities required), searched in the worker. */
+  async function onRecommend() {
+    if (job || runner.current?.busy) return
+    const c = validateCatalog(catalog)
+    const v = validateRows(rows)
+    const bad = new Set<string>()
+    if ('invalid' in c) c.invalid.forEach((k) => bad.add(k))
+    if ('invalid' in v) v.invalid.forEach((k) => bad.add(k))
+    const spec = readSpec(bad)
+    if ('types' in v) {
+      v.types.filter((t) => t.qty === null).forEach((t) => bad.add(`${t.id}.qty`)) // blank quantity: ask for a number
+    }
+    setInvalid(bad)
+    if ('invalid' in c || 'invalid' in v) {
+      showFirstProblem(bad)
+      return
+    }
+    const onlyBlankQty = [...bad].every((k) => k.endsWith('.qty'))
+    if (bad.size > 0 && !onlyBlankQty) {
+      showFirstProblem(bad) // invalid weights: the highlighted fields explain it
+      return
+    }
+    if (bad.size > 0 || c.boxes.length === 0) {
+      // Blank quantities or an empty catalog: answered at once by the same function, without starting a search.
+      setRec({ recommendation: recommendBox(c.boxes, v.types, spec), types: v.types, spec })
+      return
+    }
+    runner.current ??= new OptimizerRunner(createOptimizerWorker)
+    const version = editVersion.current
+    setJob({ kind: 'recommend', progress: null })
+    try {
+      const recommendation = await runner.current.recommend({ catalog: c.boxes, items: v.types, spec }, (progress) => setJob({ kind: 'recommend', progress }))
+      if (editVersion.current !== version) {
+        notify('Inputs changed while searching. Run the recommendation again.')
+        return
+      }
+      setRec({ recommendation, types: v.types, spec })
+    } catch (e) {
+      notify(e instanceof JobCancelledError ? 'Search cancelled' : `Recommendation failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setJob(null)
+    }
+  }
+
+  /** Puts the recommended box into the container fields and shows its layout. */
+  function onUseBox() {
+    const r = rec?.recommendation
+    if (!rec || !r || r.status !== 'found' || !r.box || !r.result) return
+    const dims = r.box.dims
+    setBox(dimsToFields(dims, unit))
+    setConfig({ box: dims, types: rec.types, weight: rec.spec, labels: snapshotLabels(rows) })
+    setOpt(r.result)
+    setHist(createHistory<Placement[]>([]))
+    setSelectedId(null)
+    setStale(false)
+    setInvalid((s) => new Set([...s].filter((k) => !k.startsWith('box.'))))
+    setTab('result')
+  }
+
+  /** Optimize (automatic) and Apply (manual): validate, optimize in the worker, then replace the automatic layout and clear the manual one. */
+  async function onOptimize() {
+    if (job || runner.current?.busy) return // never two jobs at once
+    const b = validateFields(box)
+    const v = validateRows(rows)
+    const bad = new Set<string>()
+    if ('invalid' in b) b.invalid.forEach((k) => bad.add(`box.${k}`))
+    if ('invalid' in v) v.invalid.forEach((k) => bad.add(k))
+    const spec = readSpec(bad)
+    setInvalid(bad)
+    if (bad.size > 0 || 'invalid' in b || 'invalid' in v) {
+      showFirstProblem(bad)
+      return
+    }
+    runner.current ??= new OptimizerRunner(createOptimizerWorker)
+    const version = editVersion.current
+    setJob({ kind: 'optimize', progress: null })
+    try {
+      const result = await runner.current.run({ box: b.dims, items: v.types, spec }, (progress) => setJob({ kind: 'optimize', progress }))
+      if (result.status === 'rejected') {
+        notify(result.warnings[0] ?? 'This order is too large to optimize')
+        return
+      }
+      setOpt(result)
+      setConfig({ box: b.dims, types: v.types, weight: spec, labels: snapshotLabels(rows) })
+      setHist(createHistory<Placement[]>([]))
+      setSelectedId(null)
+      setStale(editVersion.current !== version) // inputs edited while it ran are not part of this result
+      setTab('result')
+    } catch (e) {
+      notify(e instanceof JobCancelledError ? 'Optimization cancelled' : `Optimization failed: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setJob(null)
+    }
+  }
+
+  // ---- Manual arrangement ------------------------------------------------------
+
+  /** Applies the outcome of a manual action: records it, or tells the user why it was refused. */
+  function run(c: Change): boolean {
+    if (!c.ok) {
+      notify(c.reason)
+      return false
+    }
+    if (c.changed) setHist((h) => commit(h, c.placements))
+    return true
+  }
+
+  function changeMode(m: Mode) {
+    setMode(m)
+    setSelectedId(null)
+  }
+
+  function onNudge(axis: Axis, sign: 1 | -1) {
+    if (!selected || step.mm === null) return
+    run(moveBy(config.box, hist.present, selected.id, axis, sign * step.mm))
+  }
+
+  function onRotate(axis: Axis) {
+    if (selected) run(rotate(config.box, hist.present, selected.id, axis))
+  }
+
+  function onRemoveSelected() {
+    if (selected && run(removeBox(hist.present, selected.id))) setSelectedId(null)
+  }
+
+  function onAddBox(typeId: string) {
+    const t = config.types.find((x) => x.id === typeId)
+    if (!t) return
+    const c = addBox(config.box, hist.present, t)
+    if (run(c) && c.ok && c.moved) setSelectedId(c.moved.id)
+  }
+
+  function canAdd(typeId: string): boolean {
+    const t = config.types.find((x) => x.id === typeId)
+    if (!t || hist.present.length >= MANUAL_MAX_BOXES) return false
+    return t.qty === null || hist.present.filter((p) => p.typeId === typeId).length < t.qty
+  }
+
+  function onUndo() {
+    setHist(undo)
+  }
+  function onRedo() {
+    setHist(redo)
+  }
+  function onReset() {
+    setHist((h) => commit(h, []))
+    setSelectedId(null)
+  }
+  function onFromAuto() {
+    if (autoLayout.placements.length > MANUAL_MAX_BOXES) {
+      notify(`Manual mode is limited to ${MANUAL_MAX_BOXES} boxes`)
+      return
+    }
+    setHist((h) => commit(h, autoLayout.placements.map((p) => ({ ...p }))))
+    setSelectedId(null)
+  }
+
+  const interaction: Interaction = {
+    enabled: manual,
+    selectedId: selected?.id ?? null,
+    resolve: (id, x, y) => {
+      const r = resolveDrop(config.box, hist.present, id, x, y)
+      return r && { placement: r.placement, ok: r.check.ok }
+    },
+    onSelect: setSelectedId,
+    onDrop: (id, x, y) => {
+      const r = resolveDrop(config.box, hist.present, id, x, y)
+      if (!r) return
+      if (!r.check.ok) {
+        notify(r.check.reason) // the box keeps its previous position
+        return
+      }
+      const old = hist.present.find((p) => p.id === id)
+      if (old && (old.x !== r.placement.x || old.y !== r.placement.y || old.z !== r.placement.z)) {
+        setHist((h) => commit(h, h.present.map((p) => (p.id === id ? r.placement : p))))
+      }
+    },
+  }
+
+  // Keyboard: undo / redo / delete in manual mode (not while typing in a field).
+  const keys = useRef({ onUndo, onRedo, onRemoveSelected })
+  useEffect(() => {
+    keys.current = { onUndo, onRedo, onRemoveSelected }
+  })
+  useEffect(() => {
+    if (!manual) return
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) keys.current.onRedo()
+        else keys.current.onUndo()
+      } else if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        keys.current.onRedo()
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        keys.current.onRemoveSelected()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [manual])
+
+  const selectedType = selected ? config.types.find((t) => t.id === selected.typeId) : undefined
+
+  const flagged = useMemo(() => new Set([...invalid].map(tabOfKeyPure(rows))), [invalid, rows])
+  // Live name while the product still exists (renames show at once), otherwise the name it had when the layout was made.
+  const labels = useMemo(() => {
+    const live = new Map(rows.map((r, i) => [r.id, { name: rowLabel(r, i), color: r.color }]))
+    return new Map(config.types.map((t) => [t.id, live.get(t.id) ?? config.labels[t.id] ?? { name: 'Product', color: '#8899aa' }]))
+  }, [rows, config])
+  const effortNotes = manual ? [] : opt.stats.effort.notes
+  const heldBack = manual ? 0 : opt.heldBackByWeight
+
+  return (
+    <main className="app">
+      <section className="stage">
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} />
+        <Toolbar
+          mode={mode}
+          onMode={changeMode}
+          canUndo={canUndo(hist)}
+          canRedo={canRedo(hist)}
+          hasBoxes={hist.present.length > 0}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          onReset={onReset}
+          onFromAuto={onFromAuto}
+        />
+        <div className={layout.unplacedCount > 0 ? 'chip warn' : 'chip'} data-testid="chip">
+          <b>{layout.placedCount.toLocaleString('en-US')}</b> placed · {layout.usedPct.toFixed(1)}% used
+          {layout.unplacedCount > 0 && <> · {layout.unplacedCount.toLocaleString('en-US')} left out</>}
+        </div>
+        {selected && selectedType && (
+          <SelectionCard
+            placement={selected}
+            typeNumber={rows.findIndex((r) => r.id === selected.typeId) + 1}
+            typeDims={selectedType.dims}
+            unit={unit}
+            step={step}
+            onStep={(text) => setStep(editField(text, unit))}
+            onMove={onNudge}
+            onRotate={onRotate}
+            onRemove={onRemoveSelected}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
+        {job && <JobStatus label={job.kind === 'recommend' ? 'Finding a box' : 'Optimizing'} progress={job.progress} onCancel={() => runner.current?.cancel()} />}
+        {notice && (
+          <div className={notice.tone === 'info' ? 'toast info' : 'toast'} role={notice.tone === 'info' ? 'status' : 'alert'}>
+            {notice.text}
+          </div>
+        )}
+        <button
+          type="button"
+          className="reset"
+          aria-label="Reset view"
+          title="Reset view"
+          onClick={() => viewer.current?.reset()}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7" />
+            <path d="M3 4v5h5" />
+          </svg>
+        </button>
+      </section>
+      <aside className="panel">
+        <h1>Izzy Pack 3D</h1>
+        <UnitsBar unit={unit} weightUnit={wUnit} onUnit={onUnit} onWeightUnit={onWeightUnit} />
+        <Tabs value={tab} onChange={setTab} flagged={flagged} />
+        <form
+          className="tabform"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void onOptimize()
+          }}
+        >
+          <div className="tabbody">
+            <div id="panel-products" role="tabpanel" aria-labelledby="tab-products" hidden={tab !== 'products'}>
+              <ProductsTab
+                rows={rows}
+                summaries={summaries}
+                invalid={invalid}
+                unit={unit}
+                weightUnit={wUnit}
+                manual={manual}
+                busy={job !== null}
+                canAdd={canAdd}
+                onAddBox={onAddBox}
+                onEditName={onEditName}
+                onEditType={onEditType}
+                onEditWeight={onEditWeight}
+                onAddType={onAddType}
+                onDeleteType={onDeleteType}
+                csv={csv}
+                onCsvFile={(f) => void onCsvFile(f)}
+                onCsvApply={onCsvApply}
+                onCsvCancel={() => setCsv(null)}
+              />
+            </div>
+            <div id="panel-boxes" role="tabpanel" aria-labelledby="tab-boxes" hidden={tab !== 'boxes'}>
+              <BoxesTab
+                box={box}
+                invalid={invalid}
+                empty={emptyW}
+                max={maxW}
+                onEditBox={onEditBox}
+                onEditWeight={onEditWeight}
+                catalog={
+                  <CatalogPanel
+                    rows={catalog}
+                    unit={unit}
+                    weightUnit={wUnit}
+                    invalid={invalid}
+                    busy={job !== null}
+                    recommendation={rec?.recommendation ?? null}
+                    typeNumbers={typeNumbers}
+                    onEdit={onEditCatalog}
+                    onAdd={onAddCatalog}
+                    onRemove={onRemoveCatalog}
+                    onRecommend={onRecommend}
+                    onUse={onUseBox}
+                  />
+                }
+              />
+            </div>
+            <div id="panel-result" role="tabpanel" aria-labelledby="tab-result" hidden={tab !== 'result'} className="resultpane">
+              <Results
+                layout={layout}
+                unit={unit}
+                stale={stale && !manual}
+                showOrientation={!manual}
+                weight={weight}
+                weightUnit={wUnit}
+                heldBack={heldBack}
+                effortNotes={effortNotes}
+              />
+              <p className="hint">{manual ? 'Manual arrangement: these numbers follow the boxes you place.' : 'Automatic arrangement from Optimize.'}</p>
+            </div>
+            <div id="panel-report" role="tabpanel" aria-labelledby="tab-report" hidden={tab !== 'report'}>
+              <ReportTab
+                layout={layout}
+                items={config.types}
+                labels={labels}
+                unit={unit}
+                weightUnit={wUnit}
+                weight={weight}
+                manual={manual}
+                stale={stale}
+                heldBack={heldBack}
+                effortNotes={effortNotes}
+              />
+            </div>
+          </div>
+          <div className="tabfoot">
+            <p className="error" role="alert">
+              {invalid.size > 0 ? 'Check the highlighted fields' : ''}
+            </p>
+            <button type="submit" className="primary" disabled={job !== null} aria-busy={job !== null} title={manual ? 'Apply box and product changes (clears the manual arrangement)' : 'Heuristic layout, not guaranteed optimal'}>
+              {job !== null ? (job.kind === 'recommend' ? 'Searching…' : 'Optimizing…') : manual ? 'Apply' : 'Optimize'}
+            </button>
+          </div>
+        </form>
+      </aside>
+    </main>
+  )
+}
+
+/** Same mapping as `tabOfKey`, for rendering (which sections have a field to fix). */
+function tabOfKeyPure(rows: TypeRow[]): (key: string) => TabId {
+  return (key) => {
+    if (key.startsWith('box.') || key.startsWith('w.')) return 'boxes'
+    return rows.some((r) => r.id === key.split('.')[0]) ? 'products' : 'boxes'
+  }
+}
