@@ -25,6 +25,7 @@ import {
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { Layout, Placement } from '../core/layout'
+import { DEFAULT_SCENE, HALLOWEEN_SCENE, halloweenColor } from './halloween'
 
 /** Longest box side in scene units. Keeps the camera framing independent of mm / in. */
 const SCENE_SIZE = 10
@@ -111,15 +112,18 @@ export class PackViewer {
   private opts: Interaction = NO_INTERACTION
   private mesh: InstancedMesh | null = null
   private list: Placement[] = []
+  private halloween = false
+  /** Position of each product type in the list, used by the Halloween palette. */
+  private typeIndex = new Map<string, number>()
   private dims = { k: 1, bx: 1, by: 1, bz: 1, h: 1 }
   private unitBox = new BoxGeometry(1, 1, 1)
   private unitEdges = new EdgesGeometry(this.unitBox)
   // Materials live as long as the viewer: disposing and recreating them on every layout would make three.js
   // rebuild (and recompile) its shader programs each time, which stalls the page for hundreds of ms on slow GPUs.
-  private shellMaterial = new MeshBasicMaterial({ color: 0x7fb4ff, transparent: true, opacity: 0.09, depthWrite: false })
-  private shellEdgeMaterial = new LineBasicMaterial({ color: 0xbcd7ff })
+  private shellMaterial = new MeshBasicMaterial({ color: DEFAULT_SCENE.shell, transparent: true, opacity: 0.09, depthWrite: false })
+  private shellEdgeMaterial = new LineBasicMaterial({ color: DEFAULT_SCENE.shellEdges })
   private itemMaterial = new MeshStandardMaterial({ roughness: 0.55, metalness: 0.05, transparent: true, opacity: 0.88 })
-  private outlineMaterial = new LineBasicMaterial({ color: 0x0b1a33, transparent: true, opacity: 0.55 })
+  private outlineMaterial = new LineBasicMaterial({ color: DEFAULT_SCENE.outline, transparent: true, opacity: 0.55 })
   private selection = new Marker(0xffe27a, 0.22, this.unitBox, this.unitEdges)
   private ghost = new Marker(0x6cff9a, 0.3, this.unitBox, this.unitEdges)
   private raycaster = new Raycaster()
@@ -320,6 +324,7 @@ export class PackViewer {
 
     const list = layout.placements.slice(0, MAX_RENDERED)
     this.list = list
+    this.typeIndex = new Map(layout.types.map((t, i) => [t.typeId, i]))
     if (list.length > 0) {
       const gap = 0.97
       const mesh = new InstancedMesh(
@@ -342,7 +347,7 @@ export class PackViewer {
         m.makeScale(sx * gap, sy * gap, sz * gap).setPosition(cx, cy, cz)
         mesh.setMatrixAt(i, m)
         // Type color, slightly lighter toward the top for depth.
-        color.set(p.color).offsetHSL(0, 0, ((p.z + p.size.h / 2) / box.h - 0.5) * 0.14)
+        this.itemColor(p, color)
         mesh.setColorAt(i, color)
         if (outlined) {
           for (let v = 0; v < e.count; v++) {
@@ -369,7 +374,52 @@ export class PackViewer {
     // Lets tests and users' tools confirm what the scene currently shows.
     this.container.dataset.instances = String(list.length)
     this.container.dataset.expected = String(layout.placedCount)
+    this.publishTheme()
     this.updateSelection()
+  }
+
+  /** Color of one box: its own color, or (Halloween mode) the palette color of its type; plus the same height shading. */
+  private itemColor(p: Placement, out: Color): void {
+    const shade = ((p.z + p.size.h / 2) / this.dims.h - 0.5) * 0.14
+    if (this.halloween) {
+      const c = halloweenColor(this.typeIndex.get(p.typeId) ?? 0)
+      out.set(c.hex).offsetHSL(0, 0, c.tint + shade)
+    } else {
+      out.set(p.color).offsetHSL(0, 0, shade)
+    }
+  }
+
+  /**
+   * Turns the Halloween theme on or off. Only colors change: the boxes, their positions, the camera and the selection
+   * are left alone. Turning it off restores the original colors exactly.
+   */
+  setHalloween(on: boolean): void {
+    if (on === this.halloween) return
+    this.halloween = on
+    const scene = on ? HALLOWEEN_SCENE : DEFAULT_SCENE
+    this.shellMaterial.color.set(scene.shell)
+    this.shellEdgeMaterial.color.set(scene.shellEdges)
+    this.outlineMaterial.color.set(scene.outline)
+    if (this.mesh) {
+      const c = new Color()
+      this.list.forEach((p, i) => {
+        this.itemColor(p, c)
+        this.mesh!.setColorAt(i, c)
+      })
+      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true
+    }
+    this.publishTheme()
+  }
+
+  /** Test hook: which theme is on and the base color of each product type. */
+  private publishTheme(): void {
+    this.container.dataset.theme = this.halloween ? 'halloween' : 'default'
+    const colors: Record<string, string> = {}
+    for (const p of this.list) {
+      if (colors[p.typeId]) continue
+      colors[p.typeId] = this.halloween ? halloweenColor(this.typeIndex.get(p.typeId) ?? 0).hex : p.color
+    }
+    this.container.dataset.typeColors = JSON.stringify(colors)
   }
 
   resetView(): void {

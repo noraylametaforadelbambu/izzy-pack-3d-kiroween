@@ -1084,3 +1084,203 @@ input.bad {
   background: rgba(17, 26, 44, 0.96);
   color: var(--text);
 }
+
+/* Halloween mode: only the colors of the 3D view */
+.hwtoggle {
+  position: absolute;
+  top: 16px;
+  right: 64px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.hwtoggle.on {
+  border-color: #ff8a1f;
+  background: rgba(163, 91, 255, 0.28);
+  color: #ffd9b0;
+}
+.viewer.halloween {
+  background: radial-gradient(ellipse at 40% 35%, #2b0f45 0%, #0a0510 72%);
+}
+@media (max-width: 767px) {
+  .hwtoggle {
+    top: 10px;
+    right: 56px;
+    height: 40px;
+  }
+}
+
+/* Halloween mode, active marker: a small orange dot in the button */
+.hwtoggle.on::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ff8a1f;
+  box-shadow: 0 0 6px 1px rgba(255, 138, 31, 0.9);
+  vertical-align: 1px;
+}
+
+/* Halloween decoration: static corner ornaments made of CSS shapes. Never takes clicks and sits under the controls. */
+.hwdecor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.hwdecor * {
+  pointer-events: none;
+}
+.hw-pumpkin {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  width: 140px;
+  height: 120px;
+  transform-origin: left bottom;
+  filter: drop-shadow(0 0 14px rgba(255, 138, 31, 0.45));
+}
+.hw-pumpkin i,
+.hw-pumpkin .face {
+  position: absolute;
+  display: block;
+}
+.hw-pumpkin .stem {
+  left: 62px;
+  top: 0;
+  width: 16px;
+  height: 22px;
+  border-radius: 4px 4px 1px 1px;
+  background: linear-gradient(#6fae33, #2f5d1e);
+  transform: rotate(8deg);
+}
+.hw-pumpkin .lobe {
+  bottom: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #ffb44d 0%, #ff8a1f 48%, #c4540a 100%);
+  box-shadow: inset -8px -6px 14px rgba(110, 30, 0, 0.5), inset 6px 4px 10px rgba(255, 220, 150, 0.25);
+}
+.hw-pumpkin .l1 {
+  left: 0;
+  bottom: 4px;
+  width: 64px;
+  height: 100px;
+}
+.hw-pumpkin .l3 {
+  right: 0;
+  bottom: 4px;
+  width: 64px;
+  height: 100px;
+}
+.hw-pumpkin .l2 {
+  left: 30px;
+  width: 80px;
+  height: 112px;
+}
+.hw-pumpkin .face {
+  inset: 0;
+  filter: drop-shadow(0 0 4px #ffd23f) drop-shadow(0 0 10px rgba(255, 170, 0, 0.85));
+}
+.hw-pumpkin .eye {
+  top: 44px;
+  width: 24px;
+  height: 22px;
+  background: #ffe873;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.hw-pumpkin .eye.a {
+  left: 32px;
+  transform: rotate(-8deg);
+}
+.hw-pumpkin .eye.b {
+  right: 32px;
+  transform: rotate(8deg);
+}
+.hw-pumpkin .nose {
+  left: 63px;
+  top: 69px;
+  width: 14px;
+  height: 11px;
+  background: #ffe873;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.hw-pumpkin .mouth {
+  left: 34px;
+  top: 82px;
+  width: 72px;
+  height: 26px;
+  background: #ffe873;
+  clip-path: polygon(0 0, 12% 36%, 24% 0, 38% 36%, 50% 0, 62% 36%, 76% 0, 88% 36%, 100% 0, 92% 70%, 70% 100%, 50% 100%, 30% 100%, 8% 70%);
+}
+.hw-bat {
+  position: absolute;
+  width: 58px;
+  height: 30px;
+  filter: drop-shadow(0 0 5px rgba(163, 91, 255, 0.85));
+}
+.hw-bat i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 45% 38%, #ff8a1f 0 1.6px, transparent 2.2px), radial-gradient(circle at 55% 38%, #ff8a1f 0 1.6px, transparent 2.2px), #7440d8;
+  clip-path: polygon(50% 30%, 56% 8%, 59% 30%, 72% 18%, 90% 22%, 100% 10%, 96% 45%, 88% 62%, 80% 48%, 72% 68%, 62% 50%, 56% 72%, 50% 55%, 44% 72%, 38% 50%, 28% 68%, 20% 48%, 12% 62%, 4% 45%, 0 10%, 10% 22%, 28% 18%, 41% 30%, 44% 8%);
+}
+.hw-bat.b1 {
+  left: 22px;
+  top: 66px;
+  transform: rotate(-10deg);
+}
+.hw-bat.b2 {
+  /* just left of the side panel, below the top controls */
+  right: 456px;
+  top: 72px;
+  transform: rotate(9deg);
+}
+/* In manual mode the selection card sits in the bottom-left corner: the pumpkin moves up above it. */
+@media (min-width: 768px) {
+  .stage:has(.selcard) .hw-pumpkin {
+    bottom: 300px;
+  }
+}
+@supports not (clip-path: polygon(50% 0, 0 100%, 100% 100%)) {
+  .hw-bat,
+  .hw-pumpkin .eye,
+  .hw-pumpkin .nose,
+  .hw-pumpkin .mouth {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .hwdecor {
+    bottom: auto;
+    height: 46dvh;
+  }
+  .hw-pumpkin {
+    left: 6px;
+    bottom: 6px;
+    transform: scale(0.6);
+  }
+  .hw-bat {
+    width: 46px;
+    height: 24px;
+  }
+  .hw-bat.b1 {
+    left: 12px;
+    top: 14px;
+  }
+  .hw-bat.b2 {
+    right: 10px;
+    top: auto;
+    bottom: 12px;
+  }
+}

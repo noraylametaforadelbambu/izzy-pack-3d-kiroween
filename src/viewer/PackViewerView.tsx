@@ -9,20 +9,25 @@ export interface ViewerHandle {
 interface Props {
   layout: Layout
   interaction: Interaction
+  /** Halloween color theme (visual only). */
+  halloween: boolean
 }
 
 export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewerView(
-  { layout, interaction },
+  { layout, interaction, halloween },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null)
   const viewer = useRef<PackViewer | null>(null)
   const latest = useRef(layout)
   latest.current = layout
+  const theme = useRef(halloween)
+  theme.current = halloween
 
   useEffect(() => {
     const v = new PackViewer(host.current!)
     viewer.current = v
+    v.setHalloween(theme.current)
     v.setLayout(latest.current)
     return () => {
       v.dispose()
@@ -35,10 +40,14 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
   }, [layout])
 
   useEffect(() => {
+    viewer.current?.setHalloween(halloween)
+  }, [halloween])
+
+  useEffect(() => {
     viewer.current?.setInteraction(interaction)
   })
 
   useImperativeHandle(ref, () => ({ reset: () => viewer.current?.resetView() }), [])
 
-  return <div className="viewer" ref={host} data-testid="viewer" />
+  return <div className={halloween ? 'viewer halloween' : 'viewer'} ref={host} data-testid="viewer" />
 })

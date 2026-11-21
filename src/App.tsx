@@ -46,6 +46,7 @@ import { SAMPLE_BOX, SAMPLE_ITEM, type Dims } from './core/pack'
 import type { Unit } from './core/units'
 import { BoxesTab } from './ui/BoxesTab'
 import { CatalogPanel } from './ui/CatalogPanel'
+import { HalloweenDecor } from './ui/HalloweenDecor'
 import { ProductsTab, type CsvState } from './ui/ProductsTab'
 import { ReportTab } from './ui/ReportTab'
 import { Tabs, type TabId } from './ui/Tabs'
@@ -109,6 +110,8 @@ export default function App() {
   // The four sections. All of them stay mounted, so switching tabs never loses state.
   const [tab, setTab] = useState<TabId>('products')
   const [csv, setCsv] = useState<CsvState | null>(null)
+  // Halloween mode: colors of the 3D view only. Off by default and not saved; nothing else reads it.
+  const [halloween, setHalloween] = useState(false)
   const viewer = useRef<ViewerHandle>(null)
 
   const manual = mode === 'manual'
@@ -493,7 +496,8 @@ export default function App() {
   return (
     <main className="app">
       <section className="stage">
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} />
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} />
+        {halloween && <HalloweenDecor />}
         <Toolbar
           mode={mode}
           onMode={changeMode}
@@ -529,6 +533,15 @@ export default function App() {
             {notice.text}
           </div>
         )}
+        <button
+          type="button"
+          className={halloween ? 'hwtoggle on' : 'hwtoggle'}
+          aria-pressed={halloween}
+          title="Halloween mode: changes only the colors of the 3D view"
+          onClick={() => setHalloween((v) => !v)}
+        >
+          Halloween mode
+        </button>
         <button
           type="button"
           className="reset"
