@@ -4,7 +4,7 @@
 
 **Live app: https://izzy-pack-3d.pages.dev/** (hosted on Cloudflare Pages, built from the `kiroween-release` branch of the private repository).
 
-> **Start here:** open **Products** and press the orange **Try a sample order** button (full width, same place on phones and desktop). It loads three Halloween products. Then open **Boxes**, press **Recommend box** and **Use this box**, and read the **Report**.
+> **Start here:** on the home screen press the orange **Try a sample order** button (same place on phones and desktop). It loads three Halloween products. Then press **Choose a box**, **Recommend box**, **Use this box**, and **View report**.
 
 Izzy Pack 3D takes an order of rectangular products (mixed sizes, quantities and weights), recommends the smallest box from your catalog that holds all of it, and shows the arrangement in an interactive 3D view. It runs in the browser; nothing is uploaded.
 Built with React, TypeScript and Three.js (OrbitControls). Built for Kiroween 2026.
@@ -57,21 +57,23 @@ Open the repository, choose **Code → Codespaces → Create codespace on main**
 
 - Drag to rotate, scroll or pinch to zoom, press the reset button (top right) to restore the view.
 - Dimensions can be entered in **mm, cm or in**, weights in **g, kg or lb**. Sizes and weights are stored in mm and grams, so switching units never changes the physical values or the layout.
-- Enter the box (container) dimensions (L, W, H). Add up to 8 box types with **+ Type**: each has L, W, H, a quantity, and its own color. A blank quantity means "as many as fit". Delete a type with ×.
-- Press **Optimize**. The **Placed** column shows placed/requested per type.
+- In **Your order**, add up to 8 products with **+ Type**: each has L, W, H, a quantity, and its own color. A blank quantity means "as many as fit". Delete a type with ×.
+- Press **Choose a box**, then **Recommend box** (or **Use my own box**). Each product shows placed/requested in the result.
 - Switching units converts the shown values and keeps the physical sizes and the result.
 - **Optimize** runs `src/core/optimizer.ts`: it combines the six axis-aligned orientations and mixed product types, tries several strategies (layered slabs, grid slabs, extreme points), verifies every candidate (no overlaps, inside the container, 70% support) and keeps the best. It is a heuristic: the result is the best found, not proven optimal. Boxes that do not fit are reported. Large orders (over 250 items) group identical items into blocks; when the search is reduced the results panel says so (measurements and limits: `docs/optimizer-benchmark.md`).
 
-## Sections
+## Guided flow
 
-The panel is organized as **Products → Boxes → Result → Report**, with the 3D view always next to it (on phones, above it).
+The app is a four-step guided flow, with the 3D view always next to the panel (on phones, above it). Each screen has one main button, a **Back** button and a step indicator ("Step 2 of 4").
 
-- **Products**: name, size, quantity and weight per unit. **Import CSV** reads a file on your computer (columns `name, length_<unit>, width_<unit>, height_<unit>, quantity, weight_<unit>`, weight optional; the unit is in the header). **Template** downloads an example in the selected units. **Try a sample order** loads three Halloween products (skull masks, black candles and jack-o’-lanterns, with different sizes, quantities and weights): then open Boxes, press **Recommend box**, **Use this box**, and read the Report. In the 3D view the sample's boxes carry a pictogram (skull, black candle or jack-o’-lantern) on an exposed face, drawn once per product type; ordinary orders are drawn as always. If you edited your order (or imported one), it asks before replacing it. The file is checked completely first: errors are listed by row and nothing changes until you confirm the preview. Limits: 8 products, 100,000 units, 512 KB.
-- **Boxes**: the container, the weight limits and the shipping-box catalog with **Recommend box**.
-- **Result**: pieces placed, left out, volume, efficiency, weight.
-- **Report**: a readable summary of the arrangement on screen: box, pieces requested / placed / left out per product, volume, weight and notes.
+1. **Home**: title, the 3D view, **Start an order** and **Try a sample order**.
+2. **Your order**: name, size, quantity and weight per unit. **Import CSV** reads a file on your computer (columns `name, length_<unit>, width_<unit>, height_<unit>, quantity, weight_<unit>`, weight optional; the unit is in the header). **Template** downloads an example in the selected units. **Try a sample order** loads three Halloween products (skull masks, black candles and jack-o’-lanterns); if you edited your order it asks before replacing it. The CSV file is checked completely first: errors are listed by row and nothing changes until you confirm the preview. Limits: 8 products, 100,000 units, 512 KB. Main button: **Choose a box**; it stops and highlights any field that is not valid.
+3. **Choose a box**: the shipping-box catalog, the weight limits and **Recommend box**, which shows the smallest box that holds the whole order and, next to it, why each smaller box was not chosen. Main button: **Recommend box**, then **Use this box**. **Use my own box** (a closed section) packs the order into a container you type, with **Pack in my own box**.
+4. **Result**: the 3D view is the main thing, with the metrics (pieces placed and left out, volume, efficiency, weight). Main button: **View report**, a readable summary of the arrangement: box, pieces requested / placed / left out per product, volume, weight and notes. **Auto / Manual** is a secondary control above the 3D view.
 
-Switching sections keeps everything you entered, the results, the units and Auto / Manual.
+**Back** and the step indicator keep everything you entered, the units, the recommendation and a result that is still valid. Changing the order, the weight limits or the container makes the result outdated: step 4 is disabled in the indicator, the view says "Previous result (outdated)", and a new result is made with **Use this box** or **Pack in my own box**. Changing a shipping box in the catalog clears the recommendation. Changing units never changes the result.
+
+In the sample, each box carries a pictogram (skull, black candle or jack-o’-lantern) on an exposed face, drawn once per product type. **Halloween mode** is available on every screen.
 
 When the whole order does not fit, the optimizer prefers **more pieces placed** (of the products with a quantity), then more placed volume. Products without a quantity never outrank those with one. It is a heuristic; see `docs/optimizer-benchmark.md` for what the rule costs and gains.
 

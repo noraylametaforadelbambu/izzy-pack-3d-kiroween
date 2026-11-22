@@ -18,6 +18,8 @@ interface Props {
   unit: Unit
   weightUnit: WeightUnit
   manual: boolean
+  /** Show the placed / requested count on each product card (the guided order step has no layout to compare with). */
+  showPlaced?: boolean
   busy: boolean
   canAdd: (typeId: string) => boolean
   onAddBox: (typeId: string) => void
@@ -63,7 +65,7 @@ function downloadTemplate(unit: Unit, weightUnit: WeightUnit): void {
 export function ProductsTab(p: Props) {
   const fileInput = useRef<HTMLInputElement>(null)
   const confirmBox = useRef<HTMLDivElement>(null)
-  // When the question opens, bring it into view (on phones it appears below the fold, above the sticky Optimize bar).
+  // When the question opens, bring it into view (on phones it appears below the fold, above the sticky action bar).
   useEffect(() => {
     if (p.confirmSample) confirmBox.current?.scrollIntoView?.({ block: 'nearest' })
   }, [p.confirmSample])
@@ -98,9 +100,11 @@ export function ProductsTab(p: Props) {
                 value={r.name}
                 onChange={(e) => p.onEditName(r.id, e.target.value)}
               />
-              <span className={short ? 'placed short' : 'placed'} aria-label={`Type ${n} placed`}>
-                {placedText(s)}
-              </span>
+              {p.showPlaced !== false && (
+                <span className={short ? 'placed short' : 'placed'} aria-label={`Type ${n} placed`}>
+                  {placedText(s)}
+                </span>
+              )}
               {p.manual && (
                 <button type="button" className="add1" aria-label={`Add type ${n} box`} title="Add one to the container" disabled={!p.canAdd(r.id)} onClick={() => p.onAddBox(r.id)}>
                   +
@@ -186,7 +190,7 @@ export function ProductsTab(p: Props) {
       {p.confirmSample && (
         <div ref={confirmBox} className="csvbox samplebox" role="group" aria-label="Replace your products with the sample order?" data-testid="sample-confirm">
           <b>Replace your products with the sample order?</b>
-          <p>You changed the current products. Loading the sample replaces them, and your edits are lost. Results and boxes stay as they are until you press Optimize or Recommend box.</p>
+          <p>You changed the current products. Loading the sample replaces them, and your edits are lost. Any result for the old order is marked outdated.</p>
           <div className="pactions">
             <button type="button" className="add" onClick={p.onConfirmSample}>
               Replace with sample
@@ -264,7 +268,7 @@ function CsvPanel({ csv, unit, weightUnit, onApply, onCancel }: { csv: CsvState;
           {w}
         </p>
       ))}
-      <p className="muted">Importing replaces the products above. Results stay as they are until you press Optimize.</p>
+      <p className="muted">Importing replaces the products above. Any result for the old order is marked outdated.</p>
       <div className="pactions">
         <button type="button" className="add" onClick={onApply}>
           Replace products

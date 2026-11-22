@@ -127,7 +127,7 @@ Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11)
 4. A valid file is shown as a preview and replaces the products only when the user confirms. It does not start an optimization.
 5. Model limits: at most 8 products, at most 100,000 units in total, sides up to 100 m, names up to 60 characters, files up to 512 KB.
 
-### R15. Sections: Products, Boxes, Result, Report
+### R15. Sections: Products, Boxes, Result, Report (replaced by the guided flow, R19)
 1. The panel has four sections in this order: Products (list, CSV), Boxes (container, weight limits, shipping-box catalog and recommendation), Result (statistics) and Report. The units selectors and the Optimize / Apply button are always visible.
 2. The 3D viewer, the Auto / Manual switch and the camera controls are visible in every section; the viewer has an accessible description.
 3. All sections stay mounted, so switching sections keeps inputs, the catalog, the recommendation, results, validation messages, units and the Auto / Manual state.
@@ -154,3 +154,11 @@ Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11)
 2. In the theme the product types are painted bone white `#F2E8D5`, lavender `#A35BFF` and pumpkin orange `#F97316`, in list order. With more types the colors repeat, and every second repeat is lighter, so neighbours stay distinguishable.
 3. The theme also changes the container shell and outline colors and shows a pumpkin and bats in the corners of the viewer. Boxes, sizes, layout, statistics, selection and camera are unchanged; turning the theme off restores the original colors exactly.
 4. Auto and Manual modes, and the sample's pictograms, behave the same with the theme on or off. The optimizer is not involved.
+
+### R19. Guided flow
+1. The app is a guided flow of four steps with an indicator ("Step n of 4"): **Home** (title, 3D view, **Start an order**, **Try a sample order**), **Your order** (products, sizes, quantities, weights, CSV), **Choose a box** (catalog, weight limits, **Recommend box**, the reasons for the discarded smaller boxes, **Use this box**, and the option **Use my own box**) and **Result** (the 3D view first, the metrics, **View report**, and **Auto / Manual** as a secondary control). The report is the second screen of step 4.
+2. Each screen has one main button. **Back** goes one screen back (Result to Choose a box, Choose a box to Your order, Your order to Home) and never loses data: products, units, weight limits, catalog, container, recommendation and, while valid, the result and the manual arrangement.
+3. **Your order** validates the products before **Choose a box**: an invalid field is highlighted, the screen stays and the message says so. A blank quantity is allowed (own box); the recommendation then asks for numbers.
+4. Changes invalidate what depends on them: editing products, weight limits or the container clears the recommendation and marks the result outdated (the indicator disables step 4 and the view says "Previous result (outdated)"). Editing a catalog box clears only the recommendation. Unit changes and renames change nothing.
+5. A new result (Use this box, Pack in my own box) opens the Result screen in Auto mode; the old manual arrangement is cleared.
+6. The optimizer, recommendation, units, report, Halloween mode and pictograms are unchanged. The 3D view and Halloween mode are available on every screen.

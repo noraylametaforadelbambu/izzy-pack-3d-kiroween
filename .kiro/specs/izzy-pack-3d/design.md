@@ -172,3 +172,14 @@ Known limits: slabs waste cross-section when a type needs few columns; large mix
 * `viewer/halloween.ts`: the theme palette (`#F2E8D5`, `#A35BFF`, `#F97316`, repeating with a lighter tint) and the scene colors. `PackViewer.setHalloween` only recolors instances, shell and outlines; `HalloweenDecor` adds the pumpkin and bats as static page elements.
 * The **Try a sample order** button (`ProductsTab`, class `.psample .add.sample`) is styled in CSS only: solid `#F97316`, full width, `min-height: 44px`, focus ring. Same markup, same handler, same place on phones and desktop.
 * The optimizer, worker, catalog, weights and Manual mode are untouched by these features.
+
+
+## Guided flow (`App.tsx`, `ui/steps.ts`, `ui/StepIndicator.tsx`)
+
+* `App` keeps all state, as before; a `screen` value (`home | order | box | result | report`) replaces the old tabs. Every screen stays mounted and is hidden with the `hidden` attribute, so going back loses nothing.
+* `ui/steps.ts` (pure, tested): the four steps, `stepNumber`, `backTarget`, `canOpen` (the result opens only while it matches the inputs) and the mapping from a highlighted field to its screen (`stepOfKey`, `firstProblemStep`).
+* `StepIndicator` shows "Step n of 4" and four stops; done stops are green, flagged ones carry "!", the result stop is disabled while outdated.
+* Reused components: `ProductsTab` (Your order, with `showPlaced={false}`), `BoxesTab` (catalog first, weight limits, a closed "Use my own box" section), `CatalogPanel` (`hideActions`: the screen's main button does Recommend and Use), `Results`, `ReportTab`, `Toolbar`, `UnitsBar`, `JobStatus`. New: `ManualBoxes` (the "+" list for Manual mode) and `StepIndicator`. `Tabs` was removed.
+* The main button is the form's submit button: Your order → validate and go on; Choose a box → `onRecommend` or, once a box is recommended, `onUseBox`; Result → report; Report → back to result. "Pack in my own box" calls the unchanged `onOptimize`.
+* `produced` (a result exists for the user's order) and `stale` (inputs changed since) give `resultReady`. Until a result exists the view says "Example layout".
+* Manual mode only works on the Result screen (drag, keyboard shortcuts and the selection card are off elsewhere); its arrangement survives Back and returning through the indicator.

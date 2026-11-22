@@ -53,10 +53,10 @@ export function ReportTab({ layout: r, items, labels, unit, weightUnit, weight: 
       </div>
       {stale && !manual && (
         <p className="stalenote" data-testid="report-stale">
-          Inputs changed after this result. Press Optimize to update it.
+          Inputs changed after this result. Go back and choose a box again to update it.
         </p>
       )}
-      <p className="muted">{manual ? 'Manual arrangement (as currently placed in the 3D view).' : 'Automatic arrangement from Optimize.'}</p>
+      <p className="muted">{manual ? 'Manual arrangement (as currently placed in the 3D view).' : 'Automatic arrangement for the chosen box.'}</p>
 
       <h3>Box</h3>
       <dl className="rdl">

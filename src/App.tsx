@@ -50,8 +50,10 @@ import { BoxesTab } from './ui/BoxesTab'
 import { CatalogPanel } from './ui/CatalogPanel'
 import { HalloweenDecor } from './ui/HalloweenDecor'
 import { ProductsTab, type CsvState } from './ui/ProductsTab'
+import { ManualBoxes } from './ui/ManualBoxes'
 import { ReportTab } from './ui/ReportTab'
-import { Tabs, type TabId } from './ui/Tabs'
+import { StepIndicator } from './ui/StepIndicator'
+import { backTarget, firstProblemStep, stepOfKey, type StepId } from './ui/steps'
 import { UnitsBar } from './ui/UnitsBar'
 import { JobStatus } from './ui/JobStatus'
 import { Results } from './ui/Results'
@@ -84,7 +86,6 @@ const snapshotPictograms = (rows: TypeRow[]): Config['pictograms'] =>
 const snapshotLabels = (rows: TypeRow[]): Config['labels'] => Object.fromEntries(rows.map((r, i) => [r.id, { name: rowLabel(r, i), color: r.color }]))
 
 const DEFAULT_STEP_MM = 10
-const TAB_ORDER: TabId[] = ['products', 'boxes', 'result', 'report']
 
 export default function App() {
   const [unit, setUnit] = useState<Unit>('mm')
@@ -114,8 +115,10 @@ export default function App() {
   const [catalog, setCatalog] = useState<CatalogRow[]>(() => EXAMPLE_BOXES.map((d) => newCatalogRow(d, 'mm')))
   const [rec, setRec] = useState<{ recommendation: Recommendation; types: PackItem[]; spec: WeightSpec } | null>(null)
   const editVersion = useRef(0)
-  // The four sections. All of them stay mounted, so switching tabs never loses state.
-  const [tab, setTab] = useState<TabId>('products')
+  // The guided flow: Home, Your order, Choose a box, Result (+ Report). All screens stay mounted, so going back never loses state.
+  const [screen, setScreen] = useState<StepId>('home')
+  // True once a result was made for the user's order (Use this box / Pack in my own box). Until then the view shows the example layout.
+  const [produced, setProduced] = useState(false)
   const [csv, setCsv] = useState<CsvState | null>(null)
   const [confirmSample, setConfirmSample] = useState(false)
   // The order the app starts with: replacing it (or the untouched sample) needs no confirmation.
@@ -137,7 +140,7 @@ export default function App() {
     () => weightOf(layout.placements, new Map(config.types.map((t) => [t.id, (t.weightKg ?? 0) * 1000])), config.weight),
     [layout, config],
   )
-  const selected = manual ? hist.present.find((p) => p.id === selectedId) : undefined
+  const selected = manual && screen === 'result' ? hist.present.find((p) => p.id === selectedId) : undefined
 
   function notify(text: string, tone: 'error' | 'info' = 'error') {
     setNotice({ text, tone })
@@ -201,7 +204,7 @@ export default function App() {
     setInvalid((s) => new Set([...s].filter((k) => !old.has(k.split('.')[0]))))
     setCsv(null)
     edited()
-    notify(`Imported ${imported.length} ${imported.length === 1 ? 'product' : 'products'}. Press Optimize to pack them.`, 'info')
+    notify(`Imported ${imported.length} ${imported.length === 1 ? 'product' : 'products'}. Check them, then choose a box.`, 'info')
   }
 
   // ---- "Try a sample order": same path as a CSV import --------------------------------
@@ -214,11 +217,12 @@ export default function App() {
     setCsv(null)
     setConfirmSample(false)
     edited()
-    notify('Sample order loaded: 3 Halloween products. Open Boxes and press Recommend box.', 'info')
+    notify('Sample order loaded: 3 Halloween products. Check them, then choose a box.', 'info')
   }
 
   function onTrySample() {
     setCsv(null) // a pending CSV preview would be replaced too
+    setScreen('order') // the order is where the user sees the sample, or the question about replacing their products
     if (isUntouchedOrder(rows, startSignature.current)) loadSample()
     else setConfirmSample(true) // the user edited the order: ask first
   }
@@ -263,16 +267,12 @@ export default function App() {
     setRows((rs) => rs.map((r) => switchRowWeight(r, u)))
   }
 
-  /** The section a highlighted field belongs to. */
-  function tabOfKey(key: string): TabId {
-    if (key.startsWith('box.') || key.startsWith('w.')) return 'boxes'
-    return rows.some((r) => r.id === key.split('.')[0]) ? 'products' : 'boxes' // catalog rows are in Boxes
-  }
+  const rowIds = useMemo(() => new Set(rows.map((r) => r.id)), [rows])
 
-  /** Opens the first section that has a field to fix, so the highlighted field is not hidden in another tab. */
+  /** Opens the first step that has a field to fix, so the highlighted field is not hidden in another screen. */
   function showFirstProblem(bad: ReadonlySet<string>) {
-    const first = [...bad].map(tabOfKey).sort((a, b) => TAB_ORDER.indexOf(a) - TAB_ORDER.indexOf(b))[0]
-    if (first) setTab(first)
+    const first = firstProblemStep(bad, rowIds)
+    if (first) setScreen(first)
   }
 
   /** Weight settings as grams; flags invalid fields in `bad`. The maximum must be above the empty box weight. */
@@ -350,6 +350,13 @@ export default function App() {
     }
   }
 
+  /** A new result starts in Auto mode, on the Result screen. */
+  function startResult() {
+    setProduced(true)
+    setMode('auto')
+    setScreen('result')
+  }
+
   /** Puts the recommended box into the container fields and shows its layout. */
   function onUseBox() {
     const r = rec?.recommendation
@@ -362,10 +369,10 @@ export default function App() {
     setSelectedId(null)
     setStale(false)
     setInvalid((s) => new Set([...s].filter((k) => !k.startsWith('box.'))))
-    setTab('result')
+    startResult()
   }
 
-  /** Optimize (automatic) and Apply (manual): validate, optimize in the worker, then replace the automatic layout and clear the manual one. */
+  /** "Pack in my own box": validate, optimize in the worker, then replace the automatic layout and clear the manual one. */
   async function onOptimize() {
     if (job || runner.current?.busy) return // never two jobs at once
     const b = validateFields(box)
@@ -393,7 +400,7 @@ export default function App() {
       setHist(createHistory<Placement[]>([]))
       setSelectedId(null)
       setStale(editVersion.current !== version) // inputs edited while it ran are not part of this result
-      setTab('result')
+      startResult()
     } catch (e) {
       notify(e instanceof JobCancelledError ? 'Optimization cancelled' : `Optimization failed: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -464,7 +471,7 @@ export default function App() {
   }
 
   const interaction: Interaction = {
-    enabled: manual,
+    enabled: manual && screen === 'result',
     selectedId: selected?.id ?? null,
     resolve: (id, x, y) => {
       const r = resolveDrop(config.box, hist.present, id, x, y)
@@ -491,7 +498,7 @@ export default function App() {
     keys.current = { onUndo, onRedo, onRemoveSelected }
   })
   useEffect(() => {
-    if (!manual) return
+    if (!manual || screen !== 'result') return
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
@@ -509,11 +516,14 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [manual])
+  }, [manual, screen])
 
   const selectedType = selected ? config.types.find((t) => t.id === selected.typeId) : undefined
 
-  const flagged = useMemo(() => new Set([...invalid].map(tabOfKeyPure(rows))), [invalid, rows])
+  const flagged = useMemo(() => new Set<StepId>([...invalid].map((k) => stepOfKey(k, rowIds))), [invalid, rowIds])
+  const resultReady = produced && !stale
+  const recFound = rec?.recommendation.status === 'found'
+  const onResult = screen === 'result'
   // Live name while the product still exists (renames show at once), otherwise the name it had when the layout was made.
   const labels = useMemo(() => {
     const live = new Map(rows.map((r, i) => [r.id, { name: rowLabel(r, i), color: r.color }]))
@@ -522,26 +532,82 @@ export default function App() {
   const effortNotes = manual ? [] : opt.stats.effort.notes
   const heldBack = manual ? 0 : opt.heldBackByWeight
 
+  // ---- Guided flow ---------------------------------------------------------------
+
+  /** "Your order" → "Choose a box": the products must be valid. Quantities may stay blank (own box); a recommendation asks for them. */
+  function onContinueOrder() {
+    const v = validateRows(rows)
+    if ('invalid' in v) {
+      setInvalid((s) => new Set([...[...s].filter((k) => !rowIds.has(k.split('.')[0])), ...v.invalid]))
+      return
+    }
+    setInvalid((s) => new Set([...s].filter((k) => !rowIds.has(k.split('.')[0]))))
+    setScreen('box')
+  }
+
+  /** The main button of the current screen (also what Enter does in a field). */
+  function onPrimary() {
+    if (job || runner.current?.busy) return
+    if (screen === 'order') onContinueOrder()
+    else if (screen === 'box') {
+      if (recFound) onUseBox()
+      else void onRecommend()
+    } else if (screen === 'result') setScreen('report')
+    else if (screen === 'report') setScreen('result')
+  }
+
+  const back = backTarget(screen)
+  const primaryLabel =
+    job !== null
+      ? job.kind === 'recommend'
+        ? 'Searching…'
+        : 'Packing…'
+      : screen === 'order'
+        ? 'Choose a box'
+        : screen === 'box'
+          ? recFound
+            ? 'Use this box'
+            : 'Recommend box'
+          : screen === 'result'
+            ? 'View report'
+            : 'Back to result'
+  // What the 3D view shows while the user is not on the result: the example layout, or the last result.
+  const stageNote = produced ? (stale ? 'Previous result (outdated)' : 'Current result') : 'Example layout'
+
   return (
-    <main className="app">
+    <main className={`app step-${screen}`}>
       <section className="stage">
+        {screen === 'home' && (
+          <header className="hero">
+            <h1>Izzy Pack 3D</h1>
+            <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
+          </header>
+        )}
         <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} />
         {halloween && <HalloweenDecor />}
-        <Toolbar
-          mode={mode}
-          onMode={changeMode}
-          canUndo={canUndo(hist)}
-          canRedo={canRedo(hist)}
-          hasBoxes={hist.present.length > 0}
-          onUndo={onUndo}
-          onRedo={onRedo}
-          onReset={onReset}
-          onFromAuto={onFromAuto}
-        />
-        <div className={layout.unplacedCount > 0 ? 'chip warn' : 'chip'} data-testid="chip">
-          <b>{layout.placedCount.toLocaleString('en-US')}</b> placed · {layout.usedPct.toFixed(1)}% used
-          {layout.unplacedCount > 0 && <> · {layout.unplacedCount.toLocaleString('en-US')} left out</>}
-        </div>
+        {onResult && (
+          <Toolbar
+            mode={mode}
+            onMode={changeMode}
+            canUndo={canUndo(hist)}
+            canRedo={canRedo(hist)}
+            hasBoxes={hist.present.length > 0}
+            onUndo={onUndo}
+            onRedo={onRedo}
+            onReset={onReset}
+            onFromAuto={onFromAuto}
+          />
+        )}
+        {screen === 'result' || screen === 'report' ? (
+          <div className={layout.unplacedCount > 0 ? 'chip warn' : 'chip'} data-testid="chip">
+            <b>{layout.placedCount.toLocaleString('en-US')}</b> placed · {layout.usedPct.toFixed(1)}% used
+            {layout.unplacedCount > 0 && <> · {layout.unplacedCount.toLocaleString('en-US')} left out</>}
+          </div>
+        ) : screen !== 'home' ? (
+          <div className={produced && stale ? 'chip warn' : 'chip'} data-testid="stage-note">
+            {stageNote}
+          </div>
+        ) : null}
         {selected && selectedType && (
           <SelectionCard
             placement={selected}
@@ -556,7 +622,7 @@ export default function App() {
             onClose={() => setSelectedId(null)}
           />
         )}
-        {job && <JobStatus label={job.kind === 'recommend' ? 'Finding a box' : 'Optimizing'} progress={job.progress} onCancel={() => runner.current?.cancel()} />}
+        {job && <JobStatus label={job.kind === 'recommend' ? 'Finding a box' : 'Packing'} progress={job.progress} onCancel={() => runner.current?.cancel()} />}
         {notice && (
           <div className={notice.tone === 'info' ? 'toast info' : 'toast'} role={notice.tone === 'info' ? 'status' : 'alert'}>
             {notice.text}
@@ -584,27 +650,37 @@ export default function App() {
           </svg>
         </button>
       </section>
-      <aside className="panel">
-        <h1>Izzy Pack 3D</h1>
-        <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
-        <UnitsBar unit={unit} weightUnit={wUnit} onUnit={onUnit} onWeightUnit={onWeightUnit} />
-        <Tabs value={tab} onChange={setTab} flagged={flagged} />
+      <aside className={`panel step-${screen}`}>
+        {screen !== 'home' && <h1>Izzy Pack 3D</h1>}
+        <StepIndicator step={screen} resultReady={resultReady} flagged={flagged} onGo={setScreen} />
+        {screen !== 'home' && <UnitsBar unit={unit} weightUnit={wUnit} onUnit={onUnit} onWeightUnit={onWeightUnit} />}
         <form
           className="tabform"
           onSubmit={(e) => {
             e.preventDefault()
-            void onOptimize()
+            onPrimary()
           }}
         >
           <div className="tabbody">
-            <div id="panel-products" role="tabpanel" aria-labelledby="tab-products" hidden={tab !== 'products'}>
+            <div id="screen-home" className="homepane" hidden={screen !== 'home'}>
+              <button type="button" className="primary start" onClick={() => setScreen('order')}>
+                Start an order
+              </button>
+              <button type="button" className="cta-sample" onClick={onTrySample} disabled={job !== null} title="Load three example Halloween products: skull masks, black candles and jack-o’-lanterns">
+                Try a sample order
+              </button>
+              <p className="hint">Add your products, pick a shipping box and see the packing in 3D. Everything stays in your browser.</p>
+            </div>
+            <div id="screen-order" hidden={screen !== 'order'}>
+              <h2 className="steptitle">Your order</h2>
               <ProductsTab
                 rows={rows}
                 summaries={summaries}
                 invalid={invalid}
                 unit={unit}
                 weightUnit={wUnit}
-                manual={manual}
+                manual={false}
+                showPlaced={false}
                 busy={job !== null}
                 canAdd={canAdd}
                 onAddBox={onAddBox}
@@ -623,7 +699,8 @@ export default function App() {
                 onCancelSample={() => setConfirmSample(false)}
               />
             </div>
-            <div id="panel-boxes" role="tabpanel" aria-labelledby="tab-boxes" hidden={tab !== 'boxes'}>
+            <div id="screen-box" hidden={screen !== 'box'}>
+              <h2 className="steptitle">Choose a box</h2>
               <BoxesTab
                 box={box}
                 invalid={invalid}
@@ -631,6 +708,8 @@ export default function App() {
                 max={maxW}
                 onEditBox={onEditBox}
                 onEditWeight={onEditWeight}
+                onOwnBox={() => void onOptimize()}
+                busy={job !== null}
                 catalog={
                   <CatalogPanel
                     rows={catalog}
@@ -645,11 +724,13 @@ export default function App() {
                     onRemove={onRemoveCatalog}
                     onRecommend={onRecommend}
                     onUse={onUseBox}
+                    hideActions
                   />
                 }
               />
             </div>
-            <div id="panel-result" role="tabpanel" aria-labelledby="tab-result" hidden={tab !== 'result'} className="resultpane">
+            <div id="screen-result" hidden={screen !== 'result'} className="resultpane">
+              <h2 className="steptitle">Result</h2>
               <Results
                 layout={layout}
                 unit={unit}
@@ -660,9 +741,11 @@ export default function App() {
                 heldBack={heldBack}
                 effortNotes={effortNotes}
               />
-              <p className="hint">{manual ? 'Manual arrangement: these numbers follow the boxes you place.' : 'Automatic arrangement from Optimize.'}</p>
+              <p className="hint">{manual ? 'Manual arrangement: these numbers follow the boxes you place.' : 'Automatic arrangement for the chosen box.'}</p>
+              {manual && <ManualBoxes rows={rows} summaries={summaries} canAdd={canAdd} onAddBox={onAddBox} />}
             </div>
-            <div id="panel-report" role="tabpanel" aria-labelledby="tab-report" hidden={tab !== 'report'}>
+            <div id="screen-report" hidden={screen !== 'report'}>
+              <h2 className="steptitle">Report</h2>
               <ReportTab
                 layout={layout}
                 items={config.types}
@@ -677,24 +760,25 @@ export default function App() {
               />
             </div>
           </div>
-          <div className="tabfoot">
-            <p className="error" role="alert">
-              {invalid.size > 0 ? 'Check the highlighted fields' : ''}
-            </p>
-            <button type="submit" className="primary" disabled={job !== null} aria-busy={job !== null} title={manual ? 'Apply box and product changes (clears the manual arrangement)' : 'Heuristic layout, not guaranteed optimal'}>
-              {job !== null ? (job.kind === 'recommend' ? 'Searching…' : 'Optimizing…') : manual ? 'Apply' : 'Optimize'}
-            </button>
-          </div>
+          {screen !== 'home' && (
+            <div className="tabfoot">
+              <p className="error" role="alert">
+                {flagged.has(screen === 'report' ? 'result' : screen) ? 'Check the highlighted fields' : ''}
+              </p>
+              <div className="footrow">
+                {back && screen !== 'report' && (
+                  <button type="button" className="add back" onClick={() => setScreen(back)} disabled={job !== null}>
+                    Back
+                  </button>
+                )}
+                <button type="submit" className="primary" disabled={job !== null} aria-busy={job !== null}>
+                  {primaryLabel}
+                </button>
+              </div>
+            </div>
+          )}
         </form>
       </aside>
     </main>
   )
-}
-
-/** Same mapping as `tabOfKey`, for rendering (which sections have a field to fix). */
-function tabOfKeyPure(rows: TypeRow[]): (key: string) => TabId {
-  return (key) => {
-    if (key.startsWith('box.') || key.startsWith('w.')) return 'boxes'
-    return rows.some((r) => r.id === key.split('.')[0]) ? 'products' : 'boxes'
-  }
 }

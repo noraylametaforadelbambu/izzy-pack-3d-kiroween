@@ -133,7 +133,7 @@ body,
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.panel .tagline {
+.tagline {
   margin: -2px 0 10px;
   font-size: 0.82rem;
   line-height: 1.35;
@@ -749,49 +749,6 @@ input.bad {
   padding: 5px 12px;
   font-size: 0.85rem;
 }
-.tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-}
-.tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 8px 4px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.tab.on {
-  color: var(--text);
-  border-bottom-color: var(--accent);
-}
-.tabno {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--line);
-  font-size: 0.65rem;
-}
-.tab.on .tabno {
-  background: var(--accent);
-  color: #fff;
-}
-.tabflag {
-  color: var(--bad);
-  font-size: 0.85rem;
-}
 .tabform {
   display: flex;
   flex-direction: column;
@@ -934,7 +891,7 @@ input.bad {
   margin-top: 10px;
 }
 .boxestab .catalog {
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 /* Result */
@@ -1077,10 +1034,6 @@ input.bad {
     margin: 8px 10px 0;
     border-radius: 10px;
     pointer-events: auto;
-  }
-  .tab {
-    font-size: 0.8rem;
-    padding: 8px 2px;
   }
 }
 
@@ -1296,23 +1249,14 @@ input.bad {
 }
 .psample .add.sample {
   width: 100%;
-  min-height: 44px;
-  border: 1px solid #ffb066;
-  background: #f97316;
-  color: #1a0b02;
-  font-weight: 700;
-  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.28), 0 4px 14px rgba(249, 115, 22, 0.3);
+  min-height: 40px;
+  border: 1px solid #f97316;
+  background: transparent;
+  color: #ffb066;
+  font-weight: 600;
 }
 .psample .add.sample:hover:not(:disabled) {
-  background: #ff8a33;
-}
-.psample .add.sample:focus-visible {
-  outline: 2px solid #ffd9b0;
-  outline-offset: 2px;
-}
-.psample .add.sample:disabled {
-  opacity: 0.55;
-  box-shadow: none;
+  background: rgba(249, 115, 22, 0.14);
 }
 .samplebox {
   border-color: #8f6b3b;
@@ -1337,5 +1281,241 @@ input.bad {
   html,
   .app {
     scroll-padding-bottom: 96px;
+  }
+}
+
+/* ---- Guided flow: Home, Your order, Choose a box, Result ---- */
+.steps {
+  margin: 0 0 8px;
+}
+.stepline {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.stepline b {
+  color: var(--text);
+}
+.steps ol {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stop button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 6px 2px 5px;
+  border: 0;
+  border-bottom: 3px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.stop button:disabled {
+  cursor: default;
+}
+.stop.done button {
+  border-bottom-color: #3b8f72;
+  color: var(--text);
+}
+.stop.current button {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+.stop.todo button:disabled {
+  opacity: 0.55;
+}
+.stopno {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--line);
+  font-size: 0.65rem;
+}
+.stop.current .stopno {
+  background: var(--accent);
+  color: #fff;
+}
+.stop.done .stopno {
+  background: #3b8f72;
+  color: #fff;
+}
+.stoplabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tabflag {
+  color: var(--bad);
+  font-size: 0.85rem;
+}
+.steptitle {
+  margin: 4px 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.footrow {
+  display: flex;
+  gap: 8px;
+}
+.footrow .back {
+  flex: none;
+  min-height: 44px;
+  padding: 8px 16px;
+}
+.footrow .primary {
+  min-height: 44px;
+  font-size: 1rem;
+}
+.tabfoot .error:empty {
+  display: none;
+}
+
+/* Home */
+.hero {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  max-width: min(460px, calc(100% - 140px));
+  pointer-events: none;
+}
+.hero h1 {
+  margin: 0 0 6px;
+  font-size: 2.1rem;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+}
+.hero .tagline {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.homepane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.homepane .primary.start,
+.homepane .cta-sample {
+  flex: none;
+  width: 100%;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+}
+.cta-sample {
+  border: 1px solid #ffb066;
+  background: #f97316;
+  color: #1a0b02;
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.28), 0 4px 14px rgba(249, 115, 22, 0.3);
+}
+.cta-sample:hover:not(:disabled) {
+  background: #ff8a33;
+}
+.cta-sample:focus-visible {
+  outline: 2px solid #ffd9b0;
+  outline-offset: 2px;
+}
+.cta-sample:disabled {
+  opacity: 0.55;
+  box-shadow: none;
+}
+.panel.step-home,
+.panel.step-result {
+  height: auto;
+  max-height: calc(100dvh - 72px);
+}
+.panel.step-home {
+  width: 360px;
+}
+.panel.step-home .tabform {
+  flex: none;
+}
+
+/* Choose a box: your own box is an option, not the main path */
+.ownbox {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.ownbox summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.ownbox[open] summary {
+  margin-bottom: 6px;
+}
+.ownbox .ownaction {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 40px;
+}
+
+/* Manual mode on the result screen */
+.manualboxes {
+  margin-top: 8px;
+}
+.mbrow {
+  display: grid;
+  grid-template-columns: 22px 1fr auto 28px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
+.mbname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+.mbrow .add1 {
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 767px) {
+  .hero {
+    position: static;
+    max-width: none;
+    padding: 12px 14px 4px;
+    pointer-events: auto;
+  }
+  .hero h1 {
+    font-size: 1.7rem;
+  }
+  .hero .tagline {
+    font-size: 0.95rem;
+  }
+  .app.step-home .viewer,
+  .app.step-result .viewer,
+  .app.step-report .viewer {
+    height: 52dvh;
+  }
+  .panel.step-home {
+    width: auto;
+  }
+  .stoplabel {
+    font-size: 0.7rem;
   }
 }

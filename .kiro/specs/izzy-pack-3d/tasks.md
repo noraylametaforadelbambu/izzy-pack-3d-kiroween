@@ -65,6 +65,13 @@
 - [x] 23. Next to the recommended box, explain why each smaller box was discarded, from the existing trials (`BoxTrial`), in the active unit (`ui/trialReason.ts`, `CatalogPanel`). The optimizer and `recommendBox` are unchanged. _R13.9_
 - [x] 24. Hosted app on Cloudflare Pages: https://izzy-pack-3d.pages.dev/ (builds the `kiroween-release` branch). README links it.
 
+## Guided flow
+
+- [x] 25. Guided flow: Home, Your order, Choose a box, Result (+ Report), one main button per screen, Back without losing data, step indicator. _R19.1, R19.2_
+- [x] 26. Validation on Your order; changes mark the result outdated and clear the recommendation. _R19.3, R19.4_
+- [x] 27. "Use my own box" option; Manual as a secondary control on the Result screen. _R19.1, R19.5_
+- [x] 28. Tested in Chromium with WebGL, on a 1280×900 and a 390×844 screen: Start an order, Try a sample order, Back, validation, CSV, own box, Manual, report, Halloween mode. `ui/steps.test.ts` covers the step rules.
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

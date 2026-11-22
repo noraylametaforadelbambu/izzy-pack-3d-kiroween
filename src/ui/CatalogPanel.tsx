@@ -19,6 +19,8 @@ interface Props {
   onRemove: (id: string) => void
   onRecommend: () => void
   onUse: () => void
+  /** Guided flow: the step's main button does "Recommend box" and "Use this box", so the inline ones are not shown. */
+  hideActions?: boolean
 }
 
 const KEYS: { key: keyof Dims; name: string }[] = [
@@ -88,9 +90,11 @@ export function CatalogPanel(p: Props) {
         <button type="button" className="add" onClick={p.onAdd} disabled={p.rows.length >= MAX_CATALOG || p.busy} title="Add a box size">
           + Box
         </button>
-        <button type="button" className="add" onClick={p.onRecommend} disabled={p.busy || p.rows.length === 0} title="Smallest catalog box that holds the whole order">
-          Recommend box
-        </button>
+        {!p.hideActions && (
+          <button type="button" className="add" onClick={p.onRecommend} disabled={p.busy || p.rows.length === 0} title="Smallest catalog box that holds the whole order">
+            Recommend box
+          </button>
+        )}
       </div>
 
       {r && (
@@ -109,9 +113,11 @@ export function CatalogPanel(p: Props) {
                 </>
               )}
               {r.result.stats.effort.reduced && <p className="muted">The search was reduced for this large order; a smaller box may exist.</p>}
-              <button type="button" className="add" onClick={p.onUse} disabled={p.busy}>
-                Use this box
-              </button>
+              {!p.hideActions && (
+                <button type="button" className="add" onClick={p.onUse} disabled={p.busy}>
+                  Use this box
+                </button>
+              )}
             </>
           )}
           {r.status === 'not-found' && (
