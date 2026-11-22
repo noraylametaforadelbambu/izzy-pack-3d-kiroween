@@ -1,7 +1,43 @@
 # Izzy Pack 3D
 
-Shows how many identical rectangular items fit in a box. The 3D view is the main screen.
-Built with React, TypeScript and Three.js (OrbitControls).
+**Find a shipping box for your order and see how to pack it in 3D.**
+
+**Live app: https://izzy-pack-3d.pages.dev/** (hosted on Cloudflare Pages, built from the `kiroween-release` branch of the private repository).
+
+> **Start here:** open **Products** and press the orange **Try a sample order** button (full width, same place on phones and desktop). It loads three Halloween products. Then open **Boxes**, press **Recommend box** and **Use this box**, and read the **Report**.
+
+Izzy Pack 3D takes an order of rectangular products (mixed sizes, quantities and weights), recommends the smallest box from your catalog that holds all of it, and shows the arrangement in an interactive 3D view. It runs in the browser; nothing is uploaded.
+Built with React, TypeScript and Three.js (OrbitControls). Built for Kiroween 2026.
+
+## What it does
+
+- **Mixed orders**: up to 8 products, each with its own size, quantity, weight and color, in mm / cm / in and g / kg / lb.
+- **CSV import**: load products from a local file. The file is validated completely first; errors are listed by row and nothing changes until you confirm the preview.
+- **Box recommendation**: tries your shipping-box catalog from the smallest interior volume up and recommends the first box that holds the whole order within the weight limits. Next to the recommended box it says why each smaller box was not chosen: either its volume is below the order's (it was not searched, exact arithmetic), or the search placed only part of the order (a heuristic result, not a proof that it cannot fit). Sizes and volumes use the active unit.
+- **3D viewer**: rotate, zoom and reset; Auto and Manual modes; optional Halloween mode (colors only).
+- **Report**: pieces requested, placed and left out per product, volume, weight and notes, for the arrangement on screen.
+
+## Why Frankenstein
+
+Izzy Pack 3D is built from parts that were not made for each other, joined into one app:
+
+- A React 19 interface and a Three.js scene (drawn with `InstancedMesh`) that share one layout model.
+- A packing optimizer (`src/core/optimizer.ts`, a heuristic that combines layered slabs, grid slabs and extreme-point search) that runs in a Web Worker (`src/worker`) so the page stays responsive.
+- A box-recommendation search that calls that same optimizer once per catalog box (`src/core/catalog.ts`).
+- A CSV parser with unit-aware headers (`src/core/csv.ts`), a weight-aware wrapper around the optimizer (`src/core/weighted.ts`) and an exact unit model (sizes in mm, weights in grams).
+- A Halloween theme in the 3D view: skull, black candle and jack-o’-lantern pictograms painted on a canvas and mapped onto the boxes as textures (`src/viewer/pictograms.ts`, `src/viewer/decals.ts`).
+
+The optimizer makes no optimality claim; it keeps the best valid candidate it finds (see `docs/optimizer-benchmark.md`).
+
+## How I used Kiro
+
+The project was built in **Kiro Web** sessions. What you can check in this repository:
+
+- **Specs**: `.kiro/specs/izzy-pack-3d/` has `requirements.md` (R1 to R17), `design.md` and `tasks.md`. Each feature (optimizer, weights, units, Web Worker, catalog, CSV and sections, sample order) was written down as numbered requirements first, then implemented against them. Tasks in `tasks.md` are checked only when done.
+- **Tests as acceptance checks**: the requirements' acceptance values (for example the 600 × 400 × 400 mm sample, exact fit, unit round trip) are unit tests. `npx vitest --run --dir src` runs 324 tests (1 skipped).
+- **History**: the commits are small and each message names one feature. Check them with `git log`.
+
+This project does not use Kiro hooks, steering files or MCP servers.
 
 ## Run
 
@@ -48,7 +84,7 @@ When the whole order does not fit, the optimizer prefers **more pieces placed** 
 Under **Shipping boxes** you keep a list of interior sizes (add with **+ Box**, remove with ×; four examples are preloaded). **Recommend box** tries them by ascending interior volume and picks the first one where the optimizer places the **whole order**, within the weight limits from the Weight section (empty box weight and maximum gross weight apply to every box).
 
 - Quantities must be explicit: a blank quantity means "as many as fit", so the app asks for numbers first.
-- A box that holds only part of the order is never recommended, and the optimizer's rules for partial orders are unchanged.
+- A box that holds only part of the order is never recommended, and the optimizer's rules for partial orders are unchanged. Under the recommended box, **Why not the smaller boxes** lists each box that was tried first with the reason taken from the search: *not searched: its volume is below the order's* or *placed N of M in this search* (plus held back by weight or reduced search, when that applies).
 - If nothing fits completely, the message says no complete arrangement was found **in this search**. The search is a heuristic, so this is not a proof that none exists.
 - **Use this box** copies the size into the container fields and shows the layout. The search runs in the same Web Worker as Optimize (progress, Cancel, one job at a time). Sizes follow the mm / cm / in selector; the catalog is not saved between sessions.
 
@@ -62,5 +98,9 @@ Switch **Auto / Manual** at the top of the viewer. Automatic mode is the default
 - Boxes snap to walls and neighbouring faces, cannot overlap or leave the container, and need at least 70% of their base supported. Invalid moves are refused and the box keeps its position (a red preview shows while dragging).
 - Undo / Redo / Reset, plus Ctrl+Z, Ctrl+Shift+Z and Delete. **Apply** rebuilds from the inputs and clears the manual arrangement.
 - Statistics (placed, unplaced, used, free, efficiency) always reflect the boxes currently shown.
+
+## Halloween mode (optional)
+
+The **Halloween mode** button (top right of the viewer) changes only the colors of the 3D view: skull masks bone white `#F2E8D5`, black candles lavender `#A35BFF`, jack-o’-lanterns pumpkin orange `#F97316`, on a dark purple background with a pumpkin and bats in the corners. With more than three products the colors repeat, every second repeat a little lighter. Boxes, sizes, layouts, statistics and the camera are untouched, and turning it off restores the original colors. Auto and Manual modes work the same in both themes.
 
 Spec: `.kiro/specs/izzy-pack-3d/`.

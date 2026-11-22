@@ -155,6 +155,7 @@ Known limits: slabs waste cross-section when a type needs few columns; large mix
 * `catalog.ts`: `CatalogRow` (same field model as the container, so unit switches never drift), `validateCatalog`, `sortByVolume`, and `recommendBox(catalog, items, spec, options, onProgress)`: blank quantities, empty catalog and an order heavier than the limit are answered before any search; otherwise each box (ascending volume) is skipped if the order's volume exceeds it, or searched with `optimizeWeighted`; the first box with `unplacedCount === 0`, status `complete` and no weight overrun is returned with its layout. Statuses: found, not-found, needs-quantities, empty-catalog, invalid-order, over-weight.
 * `worker/jobs.ts`: a second request kind (`kind: 'recommend'`) and message (`recommendation`), `OptimizerRunner.recommend()`; same one-job-at-a-time, cancel and error handling as `run()`. Progress phases read "Box k of n: ...".
 * UI: `CatalogPanel` under the Weight section; `App` keeps the rows and the latest recommendation (cleared by any input edit) and applies it with "Use this box".
+* Why smaller boxes were skipped: `ui/trialReason.ts` turns each recorded `BoxTrial` into one sentence (`too-small` = not searched, volume below the order's; `partial` = placed N of M in this search, plus held back by weight and reduced search when set). `CatalogPanel` shows the list under the recommended box with sizes and volumes in the active unit. No new search and no change to `recommendBox` or the optimizer.
 * Limits: the weight settings are shared by all boxes; the search time is the optimizer's time per box, up to 12 boxes.
 
 ## CSV, sections and the report
@@ -162,3 +163,12 @@ Known limits: slabs waste cross-section when a type needs few columns; large mix
 * `core/csv.ts`: `parseProductsCsv` (delimiter detection, RFC 4180 reading, header units, per-row validation, model limits) and `productsTemplate`. Pure functions. `core/boxTypes.ts` adds the product name to `TypeRow` and `rowsFromProducts`.
 * UI: `Tabs` (ARIA tablist with arrow keys), `UnitsBar`, `ProductsTab` (cards, CSV import with error list / preview), `BoxesTab` (container, weight limits, `CatalogPanel`), `Results` (Result section), `ReportTab`. All four sections are rendered and hidden with the `hidden` attribute, so React state and DOM state survive tab changes. `App` keeps the whole state; the layout snapshot (`Config.labels`) keeps product names for the report after the list is replaced.
 * Choice of the layout (`optimizer.ts`): `rank` = explicit pieces, volume, bounding box; extra count-oriented candidates (`smallest` sort, ascending-volume type order); `weighted.ts` ranks by original explicit pieces, all pieces, volume.
+
+
+## Sample order, pictograms and Halloween mode
+
+* `core/sampleOrder.ts`: the three sample products as CSV-style rows (names, sizes, quantities, weights), loaded through the same validation as an imported file; `core/pictogram.ts` names the pictogram kinds (`skull`, `candle`, `pumpkin`).
+* `viewer/pictograms.ts` draws each kind on a canvas (bone white, black, lavender, orange, brown; no gold or green). `viewer/decals.ts` picks one exterior face per box (front, right or top, the largest free icon) and `PackViewer` draws one textured instanced mesh per kind, so three textures and at most three extra draw calls.
+* `viewer/halloween.ts`: the theme palette (`#F2E8D5`, `#A35BFF`, `#F97316`, repeating with a lighter tint) and the scene colors. `PackViewer.setHalloween` only recolors instances, shell and outlines; `HalloweenDecor` adds the pumpkin and bats as static page elements.
+* The **Try a sample order** button (`ProductsTab`, class `.psample .add.sample`) is styled in CSS only: solid `#F97316`, full width, `min-height: 44px`, focus ring. Same markup, same handler, same place on phones and desktop.
+* The optimizer, worker, catalog, weights and Manual mode are untouched by these features.

@@ -3,6 +3,7 @@ import { MAX_CATALOG, type BoxTrial, type CatalogRow, type Recommendation } from
 import type { Dims } from '../core/pack'
 import { formatDim, formatVolume, volumeUnitLabel, type Unit } from '../core/units'
 import { formatWeight, type WeightUnit } from '../core/weight'
+import { trialReason } from './trialReason'
 
 interface Props {
   rows: CatalogRow[]
@@ -28,19 +29,13 @@ const KEYS: { key: keyof Dims; name: string }[] = [
 
 const size = (d: Dims, unit: Unit): string => `${formatDim(d.l, unit)} × ${formatDim(d.w, unit)} × ${formatDim(d.h, unit)} ${unit}`
 
-function Trials({ trials, unit }: { trials: BoxTrial[]; unit: Unit }) {
+function Trials({ trials, unit, orderVolumeMm3 }: { trials: BoxTrial[]; unit: Unit; orderVolumeMm3: number }) {
   return (
-    <ul className="trials">
+    <ul className="trials" data-testid="trials">
       {trials.map((t) => (
         <li key={t.boxId}>
           <span>{size(t.dims, unit)}</span>
-          <i>
-            {t.outcome === 'too-small'
-              ? 'volume smaller than the order'
-              : t.outcome === 'fits'
-                ? `fits all ${t.requested.toLocaleString('en-US')}`
-                : `placed ${t.placed.toLocaleString('en-US')} of ${t.requested.toLocaleString('en-US')}`}
-          </i>
+          <i>{trialReason(t, orderVolumeMm3, unit)}</i>
         </li>
       ))}
     </ul>
@@ -109,8 +104,8 @@ export function CatalogPanel(p: Props) {
               </p>
               {r.trials.length > 1 && (
                 <>
-                  <p className="muted">Smaller boxes tried first:</p>
-                  <Trials trials={r.trials.slice(0, -1)} unit={p.unit} />
+                  <p className="muted">Why not the smaller {r.trials.length === 2 ? 'box' : 'boxes'}:</p>
+                  <Trials trials={r.trials.slice(0, -1)} unit={p.unit} orderVolumeMm3={r.orderVolumeMm3} />
                 </>
               )}
               {r.result.stats.effort.reduced && <p className="muted">The search was reduced for this large order; a smaller box may exist.</p>}
@@ -126,7 +121,7 @@ export function CatalogPanel(p: Props) {
                 None of the {r.trials.length} catalog {r.trials.length === 1 ? 'box' : 'boxes'} held all {r.orderUnits.toLocaleString('en-US')} units in this search.
                 The search is a heuristic, so this does not prove that no arrangement exists. A larger box, or a different catalog, may work.
               </p>
-              <Trials trials={r.trials} unit={p.unit} />
+              <Trials trials={r.trials} unit={p.unit} orderVolumeMm3={r.orderVolumeMm3} />
             </>
           )}
           {r.status === 'needs-quantities' && (

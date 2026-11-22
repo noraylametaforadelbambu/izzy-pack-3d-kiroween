@@ -586,6 +586,7 @@ export default function App() {
       </section>
       <aside className="panel">
         <h1>Izzy Pack 3D</h1>
+        <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
         <UnitsBar unit={unit} weightUnit={wUnit} onUnit={onUnit} onWeightUnit={onWeightUnit} />
         <Tabs value={tab} onChange={setTab} flagged={flagged} />
         <form

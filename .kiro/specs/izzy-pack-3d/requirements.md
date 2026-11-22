@@ -55,10 +55,10 @@ The 3D view updates to show the chosen arrangement, with items drawn inside the 
 5. **Item does not fit**: if every orientation gives 0, show "Item does not fit", count 0, 0.0% used, free volume equal to the full box volume. The viewer shows the empty box.
 
 ## Out of scope
-Non-axis-aligned rotation, saving or sharing layouts. (Multiple item types, mixed orientations and item weight are now in scope: see Phase 3.)
+Non-axis-aligned rotation, saving or sharing layouts. (Multiple item types, mixed orientations, item weight, CSV import and box recommendation are now in scope: see R7 to R16.)
 
 
-## Phase 3: Automatic optimization (core engine; no UI changes yet)
+## Phase 3: Automatic optimization (core engine)
 
 The product goal is **automatic** packing for businesses. Manual mode and the viewer are kept unchanged.
 
@@ -74,8 +74,8 @@ The product goal is **automatic** packing for businesses. Manual mode and the vi
 9. **No optimality is claimed.** The result is the best candidate found. The only certificate reported is the volume bound (`exceedsContainer`).
 10. Objective: see R16 (pieces of explicit quantities first, then placed volume, then smallest bounding box). Before R16 it was placed volume first.
 
-### R8. Later phases (not in this change)
-Box recommendation from a catalog, kg/lb and cm in the UI, tabbed UI, Web Worker, heavy-below-light stacking rule, block building for large mixed orders.
+### R8. Later phases
+Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11), Web Worker (R12), box recommendation (R13), CSV import (R14), tabbed UI (R15), pieces-first choice (R16), sample order (R17) and Halloween mode (R18). Still open: heavy-below-light stacking rule and several boxes per order.
 
 
 ## Weight management (added after Phase 3)
@@ -118,6 +118,7 @@ Box recommendation from a catalog, kg/lb and cm in the UI, tabbed UI, Web Worker
 6. The search runs in the Web Worker with progress and Cancel, under the one-job-at-a-time rule shared with Optimize.
 7. **Use this box** sets the container size and shows the recommended layout. Editing any input clears the recommendation.
 8. Out of scope: per-box weights or prices, saving the catalog, CSV import, several boxes per order.
+9. Next to the recommended box the app lists the smaller boxes that were tried first and why each was not chosen, using only what the search recorded (`BoxTrial`): "not searched: its volume is below the order's" (exact arithmetic) or "placed N of M in this search", plus the units held back by the weight limit and a "search reduced" note when they apply. Box sizes and volumes are shown in the active length unit. The text never claims that the order cannot fit. The optimizer and `recommendBox` are not changed.
 
 ### R14. CSV import of products
 1. Products can be imported from a local CSV file (read in the browser; nothing is uploaded). A template with the selected units can be downloaded and imports cleanly.
@@ -146,3 +147,10 @@ Box recommendation from a catalog, kg/lb and cm in the UI, tabbed UI, Web Worker
 3. Loading the sample changes only the products. It does not run Optimize, change the container, catalog, weights limits, units, results or the Auto / Manual mode.
 4. The sample is recommended a box from the example catalog (Boxes -> Recommend box), can be used (Use this box), shown in 3D and reported (Report).
 5. In the 3D view each box of the sample order shows a pictogram (skull, black candle or jack-o’-lantern, by product; bone white, black, lavender, orange and brown only: no gold, no green, no ornaments) on one exterior face that the default camera sees: front, right or top. A face is exterior when no other box touches the icon area; the face with the largest icon wins. Boxes completely surrounded by others cannot show one. Textures and materials are created once per product type (three in total) and drawn as one instanced mesh per type (at most three extra draw calls). Boxes, sizes, layout, statistics, selection and camera are unchanged. Ordinary orders (typed, imported or edited into other products) have no pictograms and render exactly as before.
+6. The **Try a sample order** button is highlighted (solid pumpkin orange, full width, at least 44 px tall, visible focus ring) on phones and desktop. Its position, label and behavior are unchanged.
+
+### R18. Halloween mode
+1. A **Halloween mode** button at the top right of the viewer turns a color-only theme on and off. It is off at start-up.
+2. In the theme the product types are painted bone white `#F2E8D5`, lavender `#A35BFF` and pumpkin orange `#F97316`, in list order. With more types the colors repeat, and every second repeat is lighter, so neighbours stay distinguishable.
+3. The theme also changes the container shell and outline colors and shows a pumpkin and bats in the corners of the viewer. Boxes, sizes, layout, statistics, selection and camera are unchanged; turning the theme off restores the original colors exactly.
+4. Auto and Manual modes, and the sample's pictograms, behave the same with the theme on or off. The optimizer is not involved.
