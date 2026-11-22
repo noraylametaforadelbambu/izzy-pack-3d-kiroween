@@ -82,6 +82,10 @@
 
 - [x] 32. Small pictogram icon before the name of each sample product in Your order (`ui/PictogramIcon.tsx`, drawn with the viewer's `drawPictogram`, from the row's `pictogram` field); none for ordinary orders. Tested in Chromium on a 390×844 screen and on desktop; `core/pictogram.test.ts`. _R17.7_
 
+## Temple bolts
+
+- [x] 33. Two metal screws on the monster's temples (`temple-bolt-*` parts, `metal` color, shiny material), stacked last, visible in the finished and the static figure; tests for their place and order. Checked in Chromium on 1280×900 and 390×844, animated and with reduced motion. _R20.1_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

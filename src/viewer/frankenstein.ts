@@ -1,16 +1,19 @@
 /**
  * The Home animation: a decorative figure of rectangular boxes (green, lilac, black) that stack up into an original
  * Frankenstein's monster. Pure data and timing, no Three.js; it has nothing to do with the order or the packing.
+ * The body is green, lilac and black; only the two temple bolts are metal, and they are screwed on last.
  *
  * Coordinates: x to the right, y up, z toward the viewer; the figure stands on y = 0 and faces +z, so the arms
  * reach out toward the camera. Every part is a box: `size` is width, height and depth, `at` its center.
  */
-export type FrankColor = 'green' | 'lilac' | 'black'
+export type FrankColor = 'green' | 'lilac' | 'black' | 'metal'
 
 export const FRANK_COLORS: Record<FrankColor, number> = {
   green: 0x62c46a,
   lilac: 0xb79cff,
   black: 0x1c1530,
+  /** Only the two temple bolts. */
+  metal: 0xc3ccd9,
 }
 
 export interface FrankPart {
@@ -18,9 +21,11 @@ export interface FrankPart {
   color: FrankColor
   size: readonly [number, number, number]
   at: readonly [number, number, number]
+  /** Stacked after everything else (the finishing touch). */
+  late?: boolean
 }
 
-const part = (name: string, color: FrankColor, size: [number, number, number], at: [number, number, number]): FrankPart => ({ name, color, size, at })
+const part = (name: string, color: FrankColor, size: [number, number, number], at: [number, number, number], late = false): FrankPart => (late ? { name, color, size, at, late } : { name, color, size, at })
 
 /** A box whose lowest face is at `bottom`. */
 const onFloor = (name: string, color: FrankColor, size: [number, number, number], x: number, bottom: number, z: number): FrankPart =>
@@ -72,12 +77,22 @@ const raw: FrankPart[] = [
   onFloor('fringe-middle', 'black', [0.5, 0.42, 0.16], -0.05, HEAD_BASE + 1.48, HEAD_FRONT + 0.06),
   onFloor('fringe-right', 'black', [0.5, 0.3, 0.16], 0.7, HEAD_BASE + 1.6, HEAD_FRONT + 0.06),
   onFloor('hair', 'black', [2.24, 0.6, 1.94], 0, HEAD_BASE + 1.9, 0),
+  ...(([-1, 1] as const).flatMap((side) => {
+    const side_ = side < 0 ? 'left' : 'right'
+    const y = HEAD_BASE + 1.2 // temple height
+    return [
+      // A metal screw on each temple: a shaft into the head, a wider cap, and a dark slot in the cap.
+      part(`temple-bolt-${side_}-shaft`, 'metal', [0.36, 0.2, 0.2], [side * 1.18, y, 0.2], true),
+      part(`temple-bolt-${side_}-cap`, 'metal', [0.14, 0.5, 0.5], [side * 1.43, y, 0.2], true),
+      part(`temple-bolt-${side_}-slot`, 'black', [0.05, 0.38, 0.08], [side * 1.52, y, 0.2], true),
+    ]
+  })),
 ]
 
-/** The parts in the order they are stacked: lowest first, so every part lands on or beside one already there. */
+/** The parts in the order they are stacked: lowest first, so every part lands on or beside one already there; the temple bolts last. */
 export const FRANK_PARTS: readonly FrankPart[] = raw
   .map((p, i) => ({ p, i }))
-  .sort((a, b) => a.p.at[1] - a.p.size[1] / 2 - (b.p.at[1] - b.p.size[1] / 2) || a.i - b.i)
+  .sort((a, b) => Number(a.p.late === true) - Number(b.p.late === true) || a.p.at[1] - a.p.size[1] / 2 - (b.p.at[1] - b.p.size[1] / 2) || a.i - b.i)
   .map((x) => x.p)
 
 /** The platform the figure stands on: black, static, drawn from the start. */
@@ -99,7 +114,7 @@ export function frankBounds(): { min: [number, number, number]; max: [number, nu
 // ---- Timing ------------------------------------------------------------------------------------
 
 /** Seconds between the start of two parts, and how long one part takes to land. */
-export const STAGGER = 0.07
+export const STAGGER = 0.06
 export const DROP_TIME = 0.8
 /** How far above its final place a part starts. */
 export const DROP_HEIGHT = 9

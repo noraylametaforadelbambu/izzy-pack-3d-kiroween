@@ -9,6 +9,7 @@ import {
   LineSegments,
   Mesh,
   MeshLambertMaterial,
+  MeshPhongMaterial,
   PerspectiveCamera,
   Scene,
   Vector3,
@@ -37,7 +38,7 @@ export class FrankensteinScene {
   private groups: Group[] = []
   private unit = new BoxGeometry(1, 1, 1)
   private unitEdges = new EdgesGeometry(this.unit)
-  private materials = new Map<FrankColor, MeshLambertMaterial>()
+  private materials = new Map<FrankColor, MeshLambertMaterial | MeshPhongMaterial>()
   private edgeMaterial = new LineBasicMaterial({ color: EDGE_COLOR, transparent: true, opacity: 0.6 })
   private time = totalDuration() + 1
   private startedAt = 0
@@ -83,7 +84,8 @@ export class FrankensteinScene {
   private box(color: FrankColor, size: readonly [number, number, number], at: readonly [number, number, number]): Group {
     let m = this.materials.get(color)
     if (!m) {
-      m = new MeshLambertMaterial({ color: FRANK_COLORS[color] })
+      // Metal is shiny (specular highlight); the rest of the figure is matte.
+      m = color === 'metal' ? new MeshPhongMaterial({ color: FRANK_COLORS[color], specular: 0xffffff, shininess: 90 }) : new MeshLambertMaterial({ color: FRANK_COLORS[color] })
       this.materials.set(color, m)
     }
     const mesh = new Mesh(this.unit, m)
