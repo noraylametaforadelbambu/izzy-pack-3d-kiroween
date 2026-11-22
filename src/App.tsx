@@ -48,6 +48,7 @@ import { SAMPLE_BOX, SAMPLE_ITEM, type Dims } from './core/pack'
 import type { Unit } from './core/units'
 import { BoxesTab } from './ui/BoxesTab'
 import { CatalogPanel } from './ui/CatalogPanel'
+import { FrankensteinHome } from './ui/FrankensteinHome'
 import { HalloweenDecor } from './ui/HalloweenDecor'
 import { ProductsTab, type CsvState } from './ui/ProductsTab'
 import { ManualBoxes } from './ui/ManualBoxes'
@@ -126,6 +127,8 @@ export default function App() {
   // Halloween mode: colors of the 3D view only. Off by default and not saved; nothing else reads it.
   const [halloween, setHalloween] = useState(false)
   const viewer = useRef<ViewerHandle>(null)
+  // The Home animation plays once per visit to the app; coming back to Home shows the finished figure.
+  const [frankPlayed, setFrankPlayed] = useState(false)
 
   const manual = mode === 'manual'
   const typeNumbers = useMemo(() => new Map(rows.map((r, i) => [r.id, i + 1])), [rows])
@@ -583,6 +586,7 @@ export default function App() {
             <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
           </header>
         )}
+        {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} />}
         <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} />
         {halloween && <HalloweenDecor />}
         {onResult && (

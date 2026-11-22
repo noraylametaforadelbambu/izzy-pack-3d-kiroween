@@ -72,6 +72,12 @@
 - [x] 27. "Use my own box" option; Manual as a secondary control on the Result screen. _R19.1, R19.5_
 - [x] 28. Tested in Chromium with WebGL, on a 1280×900 and a 390×844 screen: Start an order, Try a sample order, Back, validation, CSV, own box, Manual, report, Halloween mode. `ui/steps.test.ts` covers the step rules.
 
+## Home animation
+
+- [x] 29. Figure data and timing (`viewer/frankenstein.ts`) with tests: green, lilac and black boxes of different sizes, stacked from the feet up, brief, plays once. _R20.1, R20.2_
+- [x] 30. Separate Three.js scene (`FrankensteinScene.ts`), Home component with a discreet Replay button, reduced-motion static figure, framing for phone and desktop. _R20.2 to R20.5_
+- [x] 31. Checked in Chromium with WebGL 2, 1280×900 and 390×844, with and without reduced motion: plays once, Replay restarts it, no loop, the buttons are not covered, the sample flow still gives 26/26 and 50.8 %, pictograms intact, no console errors. _R20_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

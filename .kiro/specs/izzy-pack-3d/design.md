@@ -183,3 +183,11 @@ Known limits: slabs waste cross-section when a type needs few columns; large mix
 * The main button is the form's submit button: Your order → validate and go on; Choose a box → `onRecommend` or, once a box is recommended, `onUseBox`; Result → report; Report → back to result. "Pack in my own box" calls the unchanged `onOptimize`.
 * `produced` (a result exists for the user's order) and `stale` (inputs changed since) give `resultReady`. Until a result exists the view says "Example layout".
 * Manual mode only works on the Result screen (drag, keyboard shortcuts and the selection card are off elsewhere); its arrangement survives Back and returning through the indicator.
+
+
+## Home animation (`viewer/frankenstein.ts`, `viewer/FrankensteinScene.ts`, `ui/FrankensteinHome.tsx`)
+
+* `frankenstein.ts` (pure, tested): the figure as a list of boxes (`FRANK_PARTS`: name, color, size, center), sorted so the lowest is stacked first, the platform, the bounds, and the timing: a part starts every 0.07 s and takes 0.8 s to land (`easeOutBounce` of the remaining height, so it never goes below its place), with a small twist that straightens. The whole animation is about three seconds.
+* `FrankensteinScene.ts`: a separate `WebGLRenderer`, `Scene` and `PerspectiveCamera`. One shared unit box geometry scaled per part, three Lambert materials (green, lilac, black), light edges. `play()` runs a `requestAnimationFrame` loop only while the animation lasts and then draws the finished figure once; a `ResizeObserver` redraws it. Framing: a three-quarter view found by bisection so every corner of the figure and platform fits; on wide screens the picture is shifted left by half the panel width (`setViewOffset`). Test hooks: `data-state` (`playing`, `done`, `static`), `data-plays`, `data-parts`.
+* `FrankensteinHome.tsx`: mounts the scene on Home only and renders the replay button. `matchMedia('(prefers-reduced-motion: reduce)')` selects the static figure and hides the button. `App` remembers that the animation has played, so returning to Home shows the finished figure.
+* CSS: the canvas is `pointer-events: none`; on Home the order viewer is kept mounted but `visibility: hidden` (same size, so nothing is resized) and its reset button is hidden. On phones the canvas is in the flow above the buttons.

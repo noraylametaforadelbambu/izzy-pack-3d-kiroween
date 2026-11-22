@@ -1499,7 +1499,6 @@ input.bad {
     position: static;
     max-width: none;
     padding: 12px 14px 4px;
-    pointer-events: auto;
   }
   .hero h1 {
     font-size: 1.7rem;
@@ -1517,5 +1516,41 @@ input.bad {
   }
   .stoplabel {
     font-size: 0.7rem;
+  }
+}
+
+/* Home animation: a decorative scene above the (hidden) order viewer; it never takes clicks */
+.frank {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.app.step-home .viewer {
+  visibility: hidden;
+  pointer-events: none;
+}
+.app.step-home .reset:not(.replay) {
+  display: none;
+}
+.reset.replay {
+  opacity: 0.85;
+}
+.reset.replay:hover {
+  opacity: 1;
+}
+@media (max-width: 767px) {
+  .frank {
+    position: relative;
+    inset: auto;
+    flex: none;
+    height: 52dvh;
+  }
+  .app.step-home .viewer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52dvh;
   }
 }
