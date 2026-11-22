@@ -1554,3 +1554,10 @@ input.bad {
     height: 52dvh;
   }
 }
+
+/* Small pictogram next to a sample product's name in "Your order" */
+.picon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+}

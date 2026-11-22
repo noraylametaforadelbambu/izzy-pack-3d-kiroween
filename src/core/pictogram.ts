@@ -2,3 +2,10 @@
 export type PictogramKind = 'skull' | 'candle' | 'pumpkin'
 
 export const PICTOGRAM_KINDS: readonly PictogramKind[] = ['skull', 'candle', 'pumpkin']
+
+/** Accessible name of each pictogram (used for the small icon next to a product in "Your order"). */
+export const PICTOGRAM_LABELS: Readonly<Record<PictogramKind, string>> = {
+  skull: 'Skull',
+  candle: 'Black candle',
+  pumpkin: 'Jack-o’-lantern',
+}

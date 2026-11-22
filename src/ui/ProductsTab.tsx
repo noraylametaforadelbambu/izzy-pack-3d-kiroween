@@ -5,6 +5,7 @@ import type { TypeSummary } from '../core/layout'
 import type { Dims } from '../core/pack'
 import { formatDim, type Unit } from '../core/units'
 import { formatWeight, type WeightUnit } from '../core/weight'
+import { PictogramIcon } from './PictogramIcon'
 
 export interface CsvState {
   fileName: string
@@ -90,6 +91,7 @@ export function ProductsTab(p: Props) {
           <div className="pcard" key={r.id}>
             <div className="phead">
               <span className="swatch" style={{ background: r.color }} title={`Type ${n}`} />
+              {r.pictogram && <PictogramIcon kind={r.pictogram} />}
               <input
                 type="text"
                 className="pname"

@@ -78,6 +78,10 @@
 - [x] 30. Separate Three.js scene (`FrankensteinScene.ts`), Home component with a discreet Replay button, reduced-motion static figure, framing for phone and desktop. _R20.2 to R20.5_
 - [x] 31. Checked in Chromium with WebGL 2, 1280×900 and 390×844, with and without reduced motion: plays once, Replay restarts it, no loop, the buttons are not covered, the sample flow still gives 26/26 and 50.8 %, pictograms intact, no console errors. _R20_
 
+## Pictograms in the product list
+
+- [x] 32. Small pictogram icon before the name of each sample product in Your order (`ui/PictogramIcon.tsx`, drawn with the viewer's `drawPictogram`, from the row's `pictogram` field); none for ordinary orders. Tested in Chromium on a 390×844 screen and on desktop; `core/pictogram.test.ts`. _R17.7_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).
