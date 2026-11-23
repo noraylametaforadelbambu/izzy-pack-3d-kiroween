@@ -182,10 +182,10 @@ Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11)
 
 ### R22. Sound
 1. A **Sound** button sits next to **Halloween mode** on every screen. It is a toggle (`aria-pressed`, keyboard and touch), at least 40 × 40 px, and is off at start-up. Its state is not saved. On phones it shows only the speaker icon (the name "Sound" stays for assistive technology) and the title and buttons do not overlap down to 320 px.
-2. With Sound on, the animations have sound synthesized with the Web Audio API (no external files). Home: a soft thud as the boxes of the monster land, with simultaneous impacts grouped into one (heavier) thud, and a short metallic click when the temple screws go in. Result (sample order): a soft click as the zipper closes and a brief electric crackle with the single bolt. All sounds are quiet and short.
-3. Sounds are scheduled on the audio clock from the animation's own timeline (cues are sent a tenth of a second early with the exact delay), so they are in sync even when a frame is late.
+2. With Sound on, the animations have sound synthesized with the Web Audio API (no external files). Home: a soft thud as the boxes of the monster land, with simultaneous impacts grouped into one (heavier) thud, and a short metallic click when the temple screws go in. Result (sample order, after Use this box): a soft thud as each box lands, with only boxes landing at the same moment (within 40 ms) merged into one, then a soft click as the zipper closes and a brief electric crackle with the single bolt. All sounds are quiet and short; the Result thuds are softer than the Home ones because there are many.
+3. The whole soundtrack of an animation is scheduled once, when it starts, on the audio clock from the animation's own timeline, so the sounds are at their exact times even when frames are late (checked with the CPU throttled 6 times).
 4. Audio is unlocked by a user gesture: the Sound button, the Replay button and the click that confirms the box. Turning Sound on makes no sound by itself; Replay then plays the Home animation with sound.
-5. Turning Sound off, leaving Home or Result, pressing Back or Replay in the middle of an animation, or cutting an animation short silences everything at once; a cut-short animation plays none of its remaining sounds.
+5. Turning Sound off, leaving Home or Result, pressing Back or Replay in the middle of an animation, or cutting an animation short silences everything at once: the sounds that were still waiting are cancelled and never play.
 6. With `prefers-reduced-motion` there is no animation and so no sound. With Sound off nothing is played and no audio context is created.
 7. Sound never changes the layout, the numbers, the report or the navigation.
 

@@ -1,3 +1,5 @@
+import type { SoundEvent } from './entrance'
+
 /**
  * The Home animation: a decorative figure of rectangular boxes (green, lilac, black) that stack up into an original
  * Frankenstein's monster. Pure data and timing, no Three.js; it has nothing to do with the order or the packing.
@@ -201,4 +203,8 @@ export function frankSoundEvents(parts: readonly FrankPart[] = FRANK_PARTS): Fra
   if (screwTime >= 0) events.push({ time: screwTime, kind: 'metal', strength: 1 })
   return events.sort((a, b) => a.time - b.time)
 }
+
+/** The soundtrack of the Home animation as a timeline (see `SoundEvent`). */
+export const frankTimeline = (parts: readonly FrankPart[] = FRANK_PARTS): SoundEvent[] =>
+  frankSoundEvents(parts).map((e) => ({ at: e.time, kind: e.kind, strength: e.strength }))
 

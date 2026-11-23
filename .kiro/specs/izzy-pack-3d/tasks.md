@@ -104,6 +104,8 @@
 - [x] 40. Web Audio synthesis (`viewer/entranceSound.ts`): zipper click and bolt crackle in Result; grouped soft thuds and a metallic screw click on Home, replayable with Replay. Cues on the animation's own clock with look-ahead scheduling. _R22.2 to R22.4_
 - [x] 41. Silence on off, leave, Back, Replay and early end; none with reduced motion or with Sound off. Checked in Chromium with a recorder on the audio nodes, 390×844 and 1280×900: counts, order and timing of every sound, on/off, keyboard, reduced motion. README test count: 362. _R22.5 to R22.7_
 
+- [x] 42. Result: a soft thud as each box lands (simultaneous landings merged, 13 for the 26 boxes), before the zipper click and the crackle; the soundtracks of Home and Result are scheduled whole on the audio clock. Checked on 390×844 and 1280×900, also with the CPU 6× slower: counts, order, exact times, cancel on Back / Sound off / leaving; silent with Sound off and with reduced motion; ordinary orders unchanged. README test count: 366. _R22.2, R22.3, R22.5_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

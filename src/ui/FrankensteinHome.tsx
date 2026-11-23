@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FrankSoundEvent } from '../viewer/frankenstein'
+import type { SoundEvent } from '../viewer/entrance'
 import { FrankensteinScene } from '../viewer/FrankensteinScene'
 
 interface Props {
@@ -7,8 +7,10 @@ interface Props {
   playOnMount: boolean
   /** Called once when the animation starts for the first time. */
   onPlayed: () => void
-  /** The sounds of the animation (soft thuds, the metallic click); 'end' when it is cut short. Ignored when Sound is off. */
-  onCue?: (e: FrankSoundEvent | 'end', delay: number) => void
+  /** The whole soundtrack, once per play, when the animation starts (soft thuds, the metallic click). */
+  onSound?: (events: SoundEvent[]) => void
+  /** The animation was cut short: stop its sound. */
+  onSoundEnd?: () => void
   /** Replay was pressed (a user gesture: the place to unlock audio). */
   onReplay?: () => void
 }
@@ -19,20 +21,21 @@ const reducedMotion = (): boolean => typeof window.matchMedia === 'function' && 
  * Home decoration: boxes stack into a Frankenstein's monster, once, with a discreet Replay button. With
  * prefers-reduced-motion the finished figure is shown and there is nothing to replay. Separate from the order.
  */
-export function FrankensteinHome({ playOnMount, onPlayed, onCue, onReplay }: Props) {
+export function FrankensteinHome({ playOnMount, onPlayed, onSound, onSoundEnd, onReplay }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<FrankensteinScene | null>(null)
   const [reduced] = useState(reducedMotion)
   const first = useRef({ playOnMount, onPlayed })
-  const cue = useRef(onCue)
+  const handlers = useRef({ onSound, onSoundEnd })
   useEffect(() => {
-    cue.current = onCue
+    handlers.current = { onSound, onSoundEnd }
   })
 
   useEffect(() => {
     const s = new FrankensteinScene(host.current!, first.current.playOnMount && !reduced)
     scene.current = s
-    s.onCue = (e, delay) => cue.current?.(e, delay)
+    s.onSound = (events) => handlers.current.onSound?.(events)
+    s.onSoundEnd = () => handlers.current.onSoundEnd?.()
     if (first.current.playOnMount && !reduced) first.current.onPlayed()
     return () => {
       s.dispose()

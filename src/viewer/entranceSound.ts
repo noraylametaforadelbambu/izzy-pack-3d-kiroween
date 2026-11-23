@@ -1,13 +1,15 @@
 /**
  * Sound effects of the sample order's entrance, synthesized with the Web Audio API (no audio files): a soft click when the
- * zipper closes and a brief electric crackle with the single bolt. Everything is quiet, short and scheduled by the
- * animation's own cues, so it stays in sync with what is on screen.
+ * zipper closes and a brief electric crackle with the single bolt. Everything is quiet, short and scheduled on the audio
+ * clock from the animation's own timeline, so it stays in sync with what is on screen.
  *
  *  - `unlock()` must be called from a user gesture (the Sound button, or the click that confirms the box): browsers keep
  *    an AudioContext suspended until then.
  *  - `silence()` stops every sound right away (turning Sound off, leaving Result, a cut-short entrance).
  */
 const MASTER = 0.35
+
+import type { SoundEvent } from './entrance'
 
 type Factory = () => AudioContext | null
 
@@ -51,6 +53,28 @@ export class EntranceSound {
     }
     void this.ctx.resume()
     this.onEvent?.('unlock')
+  }
+
+  /**
+   * Schedules a whole soundtrack at once: every event is placed on the audio clock at `now + event.at`, so late frames
+   * cannot bunch or shift the sounds. `silence()` cancels whatever has not played yet.
+   */
+  schedule(events: readonly SoundEvent[]): void {
+    const ctx = this.ctx
+    if (!ctx) return
+    const base = ctx.currentTime // one reference for the whole soundtrack, so the time spent here cannot stretch it
+    for (const e of events) {
+      const delay = e.at - (ctx.currentTime - base)
+      if (e.kind === 'thud') this.thud(e.strength, delay)
+      else if (e.kind === 'zip') this.zipClick(delay)
+      else if (e.kind === 'zap') this.zap(delay)
+      else this.metalClick(delay)
+    }
+  }
+
+  /** How many sounds are playing or waiting to play. */
+  get pending(): number {
+    return this.active.size
   }
 
   /** The audio state ('running', 'suspended', ...) or 'none' before the first unlock. */

@@ -29,12 +29,6 @@ export const TOTAL_TIME = LEAVE_START + LID_LEAVE
  */
 export const ZIP_CUE = ZIP_START + ZIP_TIME * 0.92
 export const BOLT_CUE = BOLT_START + BOLT_TIME * 0.2
-export type EntranceCue = 'zip' | 'bolt' | 'end'
-/**
- * Cues are sent this many seconds before their time, with the exact delay still to wait, so the sound is scheduled on the
- * audio clock and lands on the right instant even when a frame is late.
- */
-export const CUE_LOOKAHEAD = 0.1
 
 /** How translucent the lid is at most (0 = invisible, 1 = solid). */
 export const LID_OPACITY = 0.3
@@ -82,6 +76,70 @@ export function boltAmount(time: number): number {
 
 /** The glow of the boxes follows the bolt exactly. */
 export const flashAmount = boltAmount
+
+/** One sound of an animation, on that animation's own clock. */
+export interface SoundEvent {
+  /** Seconds from the start of the animation. */
+  at: number
+  kind: 'thud' | 'zip' | 'zap' | 'metal'
+  /** 0 to 1: how loud (thuds); 1 for the others. */
+  strength: number
+}
+
+/** A box is landed (visually in place) when its fall has covered this share of its time: the ease-out is flat from there on. */
+export const IMPACT_PROGRESS = 0.9
+/** Boxes landing within this many seconds of each other count as simultaneous and make one thud. */
+export const LANDING_GROUP_WINDOW = 0.04
+
+export interface LandingSound {
+  /** Seconds from the start of the entrance. */
+  time: number
+  /** 0.25 to 0.8: how heavy the boxes that land together are. Softer than the Home thuds because there are many. */
+  strength: number
+}
+
+/** When the box with landing rank `rank` (of `count`) lands. */
+export const landingTime = (rank: number, count: number): number => (count > 1 ? (rank / (count - 1)) * STAGGER_SPAN : 0) + PIECE_TIME * IMPACT_PROGRESS
+
+/**
+ * The thuds of the boxes landing, on the animation's clock. `volumesByRank[r]` is the volume of the box that lands r-th.
+ * Only boxes that land at (almost) the same time are merged (at their mean time, a little heavier); every other box
+ * has its own soft thud, at the moment it lands.
+ */
+export function landingSounds(volumesByRank: readonly number[]): LandingSound[] {
+  const n = volumesByRank.length
+  if (n === 0) return []
+  const biggest = Math.max(...volumesByRank, 1e-9)
+  const out: LandingSound[] = []
+  let times: number[] = []
+  let volume = 0
+  const flush = (): void => {
+    if (times.length === 0) return
+    const time = times.reduce((a, b) => a + b, 0) / times.length
+    out.push({ time, strength: Math.min(0.8, 0.25 + 0.5 * Math.sqrt(volume / (2 * biggest))) })
+    times = []
+    volume = 0
+  }
+  for (let r = 0; r < n; r++) {
+    const t = landingTime(r, n)
+    if (times.length > 0 && t - times[0] > LANDING_GROUP_WINDOW) flush()
+    times.push(t)
+    volume += volumesByRank[r]
+  }
+  flush()
+  return out
+}
+
+/**
+ * The whole soundtrack of the Result entrance, scheduled once when it starts: a soft thud for each box (or group landing
+ * together), then the zipper click and the crackle of the bolt. Because every sound is placed on the audio clock at the
+ * start, a late frame cannot bunch or shift them.
+ */
+export function entranceTimeline(landings: readonly LandingSound[]): SoundEvent[] {
+  const events: SoundEvent[] = landings.map((l) => ({ at: l.time, kind: 'thud' as const, strength: l.strength }))
+  events.push({ at: ZIP_CUE, kind: 'zip', strength: 1 }, { at: BOLT_CUE, kind: 'zap', strength: 1 })
+  return events.sort((x, y) => x.at - y.at)
+}
 
 /** Indices of the pieces in landing order: lowest first, then by x and y, so the stack builds up from the floor. */
 export function landingOrder(list: ReadonlyArray<{ x: number; y: number; z: number }>): number[] {

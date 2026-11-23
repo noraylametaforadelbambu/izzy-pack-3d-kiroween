@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   BOLT_CUE,
   BOLT_START,
-  CUE_LOOKAHEAD,
+  entranceTimeline,
+  IMPACT_PROGRESS,
+  LANDING_GROUP_WINDOW,
+  landingSounds,
+  landingTime,
   BOLT_TIME,
   FLASH_PEAK,
   LAND_TIME,
@@ -157,11 +161,63 @@ describe('sound cues', () => {
   })
 })
 
-describe('cue look-ahead', () => {
-  it('cues are sent a little early (under a quarter second) and never before the lid is there', () => {
-    expect(CUE_LOOKAHEAD).toBeGreaterThan(0.05)
-    expect(CUE_LOOKAHEAD).toBeLessThan(0.25)
-    expect(ZIP_CUE - CUE_LOOKAHEAD).toBeGreaterThan(ZIP_START)
+describe('entrance soundtrack', () => {
+  it('is one timeline: thuds first, then the zipper click, then the crackle, in order and inside the animation', () => {
+    const landings = landingSounds(Array.from({ length: 26 }, () => 1))
+    const tl = entranceTimeline(landings)
+    expect(tl.length).toBe(landings.length + 2)
+    expect(tl.map((e) => e.at)).toEqual([...tl.map((e) => e.at)].sort((a, b) => a - b))
+    expect(tl.slice(-2).map((e) => e.kind)).toEqual(['zip', 'zap'])
+    expect(tl.slice(0, -2).every((e) => e.kind === 'thud')).toBe(true)
+    expect(tl[tl.length - 2].at).toBe(ZIP_CUE)
+    expect(tl[tl.length - 1].at).toBe(BOLT_CUE)
+    expect(tl.every((e) => e.at > 0 && e.at < TOTAL_TIME)).toBe(true)
+    expect(tl.every((e) => e.strength > 0 && e.strength <= 1)).toBe(true)
   })
 })
 
+describe('landing thuds', () => {
+  const same = Array.from({ length: 26 }, () => 1)
+  it('a box lands when its fall is over (ease-out, no bounce): never before it has fallen, never after all have landed', () => {
+    expect(IMPACT_PROGRESS).toBeGreaterThan(0.8)
+    expect(remaining(IMPACT_PROGRESS)).toBeLessThan(0.002)
+    for (let r = 0; r < 26; r++) {
+      expect(landingTime(r, 26)).toBeGreaterThanOrEqual(PIECE_TIME * IMPACT_PROGRESS - 1e-9)
+      expect(landingTime(r, 26)).toBeLessThanOrEqual(LAND_TIME)
+    }
+    expect(landingTime(0, 26)).toBeCloseTo(PIECE_TIME * IMPACT_PROGRESS, 9)
+    expect(landingTime(25, 26)).toBeCloseTo(STAGGER_SPAN + PIECE_TIME * IMPACT_PROGRESS, 9)
+  })
+  it('only boxes landing at (almost) the same moment are grouped: one thud per box, or per pair at 22 ms apart', () => {
+    const s = landingSounds(same)
+    expect(s.length).toBeGreaterThan(26 / 3)
+    expect(s.length).toBeLessThanOrEqual(26)
+    for (let i = 1; i < s.length; i++) expect(s[i].time - s[i - 1].time).toBeGreaterThan(0)
+    // the same grouping, counted independently: a new group starts when a box lands more than the window after the group's first
+    let groups = 0
+    let first = -Infinity
+    for (let r = 0; r < 26; r++) {
+      const t = landingTime(r, 26)
+      if (t - first > LANDING_GROUP_WINDOW) {
+        groups++
+        first = t
+      }
+    }
+    expect(s.length).toBe(groups)
+    expect(landingSounds([1, 1]).length).toBe(2) // two boxes 0.55 s apart are never merged
+    expect(landingSounds([1])).toHaveLength(1)
+    expect(landingSounds([])).toEqual([])
+  })
+  it('two boxes landing together make a heavier thud than one box alone', () => {
+    expect(landingSounds(same)[0].strength).toBeGreaterThan(landingSounds([1])[0].strength)
+  })
+  it('thuds are soft, scale with the size of the boxes, and all come before the lid', () => {
+    const mixed = Array.from({ length: 26 }, (_, i) => (i % 3 === 0 ? 2.86 : i % 3 === 1 ? 0.735 : 1.33))
+    const s = landingSounds(mixed)
+    expect(s.every((x) => x.strength >= 0.25 && x.strength <= 0.8)).toBe(true)
+    expect(Math.max(...s.map((x) => x.strength))).toBeGreaterThan(Math.min(...s.map((x) => x.strength)))
+    expect(s[s.length - 1].time).toBeLessThanOrEqual(LAND_TIME)
+    expect(s[s.length - 1].time).toBeLessThan(LID_START)
+    expect(landingSounds(same).every((x) => x.time < ZIP_CUE - 0.5)).toBe(true)
+  })
+})

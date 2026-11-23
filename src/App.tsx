@@ -52,7 +52,7 @@ import { FrankensteinHome } from './ui/FrankensteinHome'
 import { HalloweenDecor } from './ui/HalloweenDecor'
 import { SoundToggle } from './ui/SoundToggle'
 import { EntranceSound } from './viewer/entranceSound'
-import type { FrankSoundEvent } from './viewer/frankenstein'
+import type { SoundEvent } from './viewer/entrance'
 import { ProductsTab, type CsvState } from './ui/ProductsTab'
 import { ManualBoxes } from './ui/ManualBoxes'
 import { ReportTab } from './ui/ReportTab'
@@ -576,7 +576,10 @@ export default function App() {
       const a = new EntranceSound()
       a.onEvent = (name) => {
         const el = soundButton.current
-        if (el) el.dataset.log = `${el.dataset.log ?? ''}${el.dataset.log ? ',' : ''}${name}` // test hook: what was played
+        if (el) {
+          el.dataset.log = `${el.dataset.log ?? ''}${el.dataset.log ? ',' : ''}${name}` // test hook: what was scheduled
+          el.dataset.pending = String(a.pending)
+        }
       }
       audio.current = a
     }
@@ -584,22 +587,14 @@ export default function App() {
     if (soundButton.current) soundButton.current.dataset.audio = audio.current.state
   }
 
-  /** The sounds of the Home animation: soft thuds as the boxes land, a metallic click with the screws. */
-  function onHomeCue(e: FrankSoundEvent | 'end', delay: number) {
-    const a = audio.current
-    if (!a || !soundOnRef.current) return
-    if (e === 'end') a.silence()
-    else if (e.kind === 'thud') a.thud(e.strength, delay)
-    else a.metalClick(delay)
+  /** An animation starts: its whole soundtrack is scheduled on the audio clock (only while Sound is on). */
+  function onSoundtrack(events: SoundEvent[]) {
+    if (soundOnRef.current) audio.current?.schedule(events)
   }
 
-  /** The sounds of the Result entrance: the zipper click and the crackle of the single bolt. */
-  function onResultCue(c: 'zip' | 'bolt' | 'end', delay: number) {
-    const a = audio.current
-    if (!a || !soundOnRef.current) return
-    if (c === 'end') a.silence()
-    else if (c === 'zip') a.zipClick(delay)
-    else a.zap(delay)
+  /** An animation stopped, finished or cut short: whatever is left of its sound stops. */
+  function onSoundEnd() {
+    audio.current?.silence()
   }
   useEffect(() => () => audio.current?.dispose(), [])
   const waitingForNumbers = metricsHidden && screen === 'result'
@@ -670,8 +665,8 @@ export default function App() {
             <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
           </header>
         )}
-        {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} onCue={onHomeCue} onReplay={() => soundOnRef.current && unlockAudio()} />}
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} onEntranceReveal={() => setMetricsHidden(false)} onEntranceCue={onResultCue} />
+        {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} onSound={onSoundtrack} onSoundEnd={onSoundEnd} onReplay={() => soundOnRef.current && unlockAudio()} />}
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} onEntranceReveal={() => setMetricsHidden(false)} onEntranceSound={onSoundtrack} onEntranceEnd={onSoundEnd} />
         {halloween && <HalloweenDecor />}
         {onResult && (
           <Toolbar
