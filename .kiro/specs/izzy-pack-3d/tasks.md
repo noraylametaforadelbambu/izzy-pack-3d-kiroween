@@ -86,6 +86,10 @@
 
 - [x] 33. Two metal screws on the monster's temples (`temple-bolt-*` parts, `metal` color, shiny material), stacked last, visible in the finished and the static figure; tests for their place and order. Checked in Chromium on 1280×900 and 390×844, animated and with reduced motion. _R20.1_
 
+## Result in sight on phones
+
+- [x] 34. After Use this box / Pack in my own box, scroll the 3D view into sight on phones (390 px), none on desktop. Checked from the bottom button with the sample order: 26/26, 50.8 %, 5.24 kg; with and without reduced motion. README test count corrected (343 tests, 1 skipped). _R19.7_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

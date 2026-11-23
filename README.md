@@ -34,7 +34,7 @@ The optimizer makes no optimality claim; it keeps the best valid candidate it fi
 The project was built in **Kiro Web** sessions. What you can check in this repository:
 
 - **Specs**: `.kiro/specs/izzy-pack-3d/` has `requirements.md` (R1 to R17), `design.md` and `tasks.md`. Each feature (optimizer, weights, units, Web Worker, catalog, CSV and sections, sample order) was written down as numbered requirements first, then implemented against them. Tasks in `tasks.md` are checked only when done.
-- **Tests as acceptance checks**: the requirements' acceptance values (for example the 600 × 400 × 400 mm sample, exact fit, unit round trip) are unit tests. `npx vitest --run --dir src` runs 324 tests (1 skipped).
+- **Tests as acceptance checks**: the requirements' acceptance values (for example the 600 × 400 × 400 mm sample, exact fit, unit round trip) are unit tests. `npx vitest --run --dir src` runs 343 tests (1 skipped).
 - **History**: the commits are small and each message names one feature. Check them with `git log`.
 
 This project does not use Kiro hooks, steering files or MCP servers.
@@ -71,7 +71,7 @@ The app is a four-step guided flow, with the 3D view always next to the panel (o
 3. **Choose a box**: the shipping-box catalog, the weight limits and **Recommend box**, which shows the smallest box that holds the whole order and, next to it, why each smaller box was not chosen. Main button: **Recommend box**, then **Use this box**. **Use my own box** (a closed section) packs the order into a container you type, with **Pack in my own box**.
 4. **Result**: the 3D view is the main thing, with the metrics (pieces placed and left out, volume, efficiency, weight). Main button: **View report**, a readable summary of the arrangement: box, pieces requested / placed / left out per product, volume, weight and notes. **Auto / Manual** is a secondary control above the 3D view.
 
-**Back** and the step indicator keep everything you entered, the units, the recommendation and a result that is still valid. Changing the order, the weight limits or the container makes the result outdated: step 4 is disabled in the indicator, the view says "Previous result (outdated)", and a new result is made with **Use this box** or **Pack in my own box**. Changing a shipping box in the catalog clears the recommendation. Changing units never changes the result.
+On a phone the 3D view is above the panel, so after **Use this box** or **Pack in my own box** the page scrolls up by itself and the 3D view is in sight when the Result opens (instantly if the system asks to reduce motion). On a wide screen nothing scrolls. **Back** and the step indicator keep everything you entered, the units, the recommendation and a result that is still valid. Changing the order, the weight limits or the container makes the result outdated: step 4 is disabled in the indicator, the view says "Previous result (outdated)", and a new result is made with **Use this box** or **Pack in my own box**. Changing a shipping box in the catalog clears the recommendation. Changing units never changes the result.
 
 In the sample, each box carries a pictogram (skull, black candle or jack-o’-lantern) on an exposed face, drawn once per product type. **Halloween mode** is available on every screen.
 

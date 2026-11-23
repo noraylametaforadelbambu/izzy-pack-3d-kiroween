@@ -127,6 +127,8 @@ export default function App() {
   // Halloween mode: colors of the 3D view only. Off by default and not saved; nothing else reads it.
   const [halloween, setHalloween] = useState(false)
   const viewer = useRef<ViewerHandle>(null)
+  const stage = useRef<HTMLElement>(null)
+  const revealStage = useRef(false)
   // The Home animation plays once per visit to the app; coming back to Home shows the finished figure.
   const [frankPlayed, setFrankPlayed] = useState(false)
 
@@ -272,6 +274,16 @@ export default function App() {
 
   const rowIds = useMemo(() => new Set(rows.map((r) => r.id)), [rows])
 
+  // After "Use this box" / "Pack in my own box" on a phone (one column: viewer above the panel), the confirm button
+  // is at the bottom of the page. Show the 3D view without a manual scroll. Wide screens show both side by side: no scroll.
+  useEffect(() => {
+    if (screen !== 'result' || !revealStage.current) return
+    revealStage.current = false
+    if (!window.matchMedia('(max-width: 767px)').matches) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    stage.current?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+  }, [screen])
+
   /** Opens the first step that has a field to fix, so the highlighted field is not hidden in another screen. */
   function showFirstProblem(bad: ReadonlySet<string>) {
     const first = firstProblemStep(bad, rowIds)
@@ -357,6 +369,7 @@ export default function App() {
   function startResult() {
     setProduced(true)
     setMode('auto')
+    revealStage.current = true // on phones the 3D view is above the panel: bring it into view once the Result screen is shown
     setScreen('result')
   }
 
@@ -579,7 +592,7 @@ export default function App() {
 
   return (
     <main className={`app step-${screen}`}>
-      <section className="stage">
+      <section className="stage" ref={stage}>
         {screen === 'home' && (
           <header className="hero">
             <h1>Izzy Pack 3D</h1>

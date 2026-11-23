@@ -182,6 +182,7 @@ Known limits: slabs waste cross-section when a type needs few columns; large mix
 * Reused components: `ProductsTab` (Your order, with `showPlaced={false}`), `BoxesTab` (catalog first, weight limits, a closed "Use my own box" section), `CatalogPanel` (`hideActions`: the screen's main button does Recommend and Use), `Results`, `ReportTab`, `Toolbar`, `UnitsBar`, `JobStatus`. New: `ManualBoxes` (the "+" list for Manual mode) and `StepIndicator`. `Tabs` was removed.
 * The main button is the form's submit button: Your order → validate and go on; Choose a box → `onRecommend` or, once a box is recommended, `onUseBox`; Result → report; Report → back to result. "Pack in my own box" calls the unchanged `onOptimize`.
 * `produced` (a result exists for the user's order) and `stale` (inputs changed since) give `resultReady`. Until a result exists the view says "Example layout".
+* `startResult` sets a flag; an effect on `screen` then calls `stage.scrollIntoView` once, only when `(max-width: 767px)` matches (`behavior: 'auto'` under reduced motion, `'smooth'` otherwise). Going back or opening the report never scrolls. Focus stays on the main button, so keyboard use continues with "View report".
 * Manual mode only works on the Result screen (drag, keyboard shortcuts and the selection card are off elsewhere); its arrangement survives Back and returning through the indicator.
 
 
