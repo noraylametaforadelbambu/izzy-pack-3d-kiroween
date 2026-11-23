@@ -123,6 +123,8 @@ interface Entrance {
   decals: Float32Array[]
   outline: Float32Array | null
   drop: number
+  /** Called once, when the seam and the bolt are done (or at once if the entrance ends early): the numbers may be shown. */
+  reveal: (() => void) | null
 }
 
 /** Out of sight: farther than the camera can see. */
@@ -595,12 +597,13 @@ export class PackViewer {
    * fades (3.5 s in all, once per call). Only the drawing changes: the layout, the camera and the pictograms are untouched, and every
    * box ends exactly where it was. Does nothing with `prefers-reduced-motion` or an empty layout. Returns whether it started.
    */
-  playEntrance(): boolean {
+  playEntrance(onReveal?: () => void): boolean {
     this.endEntrance()
     const mesh = this.mesh
     const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (!mesh || this.list.length === 0 || reduced) {
       this.container.dataset.entrance = 'skipped'
+      onReveal?.() // nothing to wait for: show the numbers at once
       return false
     }
     mesh.computeBoundingSphere() // with the final positions, before any box is moved out of place
@@ -615,6 +618,7 @@ export class PackViewer {
       decals: this.decalSets.map((d) => Float32Array.from(d.mesh.instanceMatrix.array)),
       outline,
       drop: this.dims.by * DROP_SHARE,
+      reveal: onReveal ?? null,
     }
     this.entrancePlays++
     this.container.dataset.entrancePlays = String(this.entrancePlays)
@@ -651,6 +655,7 @@ export class PackViewer {
       attr.needsUpdate = true
     }
     this.lid?.update(time)
+    if (time >= LEAVE_START) this.revealNumbers(e)
     // Test hooks: which part of the entrance is on screen, and whether the lid and the bolt have been shown.
     const phase = time < LAND_TIME ? 'pieces' : time < ZIP_START ? 'lid' : time < BOLT_START ? 'zip' : time < BOLT_START + BOLT_TIME ? 'bolt' : time < LEAVE_START ? 'hold' : 'leave'
     this.container.dataset.entrancePhase = phase
@@ -661,11 +666,19 @@ export class PackViewer {
     this.itemMaterial.emissiveIntensity = FLASH_PEAK * f
   }
 
+  /** Tells the app (once) that the numbers can be shown. */
+  private revealNumbers(e: Entrance): void {
+    const f = e.reveal
+    e.reveal = null
+    f?.()
+  }
+
   /** Puts everything back exactly where the layout has it and stops the entrance (also when it is cut short). */
   endEntrance(): void {
     const e = this.entrance
     if (!e) return
     this.entrance = null
+    this.revealNumbers(e) // cut short or finished: the numbers are never left hidden
     const mesh = this.mesh
     if (mesh) {
       ;(mesh.instanceMatrix.array as Float32Array).set(e.boxes)

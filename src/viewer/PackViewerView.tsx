@@ -19,10 +19,12 @@ interface Props {
    * the same token never does, and leaving the Result screen (null) cuts it short with the boxes in place.
    */
   entrance?: number | null
+  /** Called once per entrance when its seam and bolt are done, or when it ends early or does not run (reduced motion). */
+  onEntranceReveal?: () => void
 }
 
 export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewerView(
-  { layout, interaction, halloween, pictograms, entrance = null },
+  { layout, interaction, halloween, pictograms, entrance = null, onEntranceReveal },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null)
@@ -55,10 +57,12 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
 
   // After the layout effect above, so the boxes are the new ones when the entrance starts.
   const played = useRef<number | null>(null)
+  const reveal = useRef(onEntranceReveal)
+  reveal.current = onEntranceReveal
   useEffect(() => {
     if (entrance === null || entrance === played.current) return
     played.current = entrance
-    viewer.current?.playEntrance()
+    viewer.current?.playEntrance(() => reveal.current?.())
     return () => viewer.current?.endEntrance()
   }, [entrance])
 

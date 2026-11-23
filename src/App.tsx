@@ -122,6 +122,8 @@ export default function App() {
   const [produced, setProduced] = useState(false)
   // Token of the entrance animation of the sample order: a new one per "Use this box" on the sample (never for ordinary orders).
   const [entrance, setEntrance] = useState(0)
+  // While the entrance animation of the sample runs, the placement numbers wait: they appear when the seam and the bolt are done.
+  const [metricsHidden, setMetricsHidden] = useState(false)
   const [csv, setCsv] = useState<CsvState | null>(null)
   const [confirmSample, setConfirmSample] = useState(false)
   // The order the app starts with: replacing it (or the untouched sample) needs no confirmation.
@@ -369,6 +371,9 @@ export default function App() {
 
   /** A new result starts in Auto mode, on the Result screen. */
   function startResult() {
+    // The "Sample order loaded" message belongs to the previous screen: do not carry it into the Result.
+    window.clearTimeout(noticeTimer.current)
+    setNotice(null)
     setProduced(true)
     setMode('auto')
     revealStage.current = true // on phones the 3D view is above the panel: bring it into view once the Result screen is shown
@@ -387,7 +392,11 @@ export default function App() {
     setSelectedId(null)
     setStale(false)
     setInvalid((s) => new Set([...s].filter((k) => !k.startsWith('box.'))))
-    if (Object.keys(snapshotPictograms(rows)).length > 0) setEntrance((n) => n + 1)
+    if (Object.keys(snapshotPictograms(rows)).length > 0) {
+      setEntrance((n) => n + 1)
+      // Reduced motion has no animation, so nothing waits: the numbers show from the first frame.
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) setMetricsHidden(true)
+    }
     startResult()
   }
 
@@ -541,6 +550,13 @@ export default function App() {
 
   const flagged = useMemo(() => new Set<StepId>([...invalid].map((k) => stepOfKey(k, rowIds))), [invalid, rowIds])
   const resultReady = produced && !stale
+  const waitingForNumbers = metricsHidden && screen === 'result'
+  // Safety net: the numbers are never hidden for more than a few seconds, whatever happens to the animation.
+  useEffect(() => {
+    if (!metricsHidden) return
+    const t = window.setTimeout(() => setMetricsHidden(false), 6000)
+    return () => window.clearTimeout(t)
+  }, [metricsHidden])
   const recFound = rec?.recommendation.status === 'found'
   const onResult = screen === 'result'
   // Live name while the product still exists (renames show at once), otherwise the name it had when the layout was made.
@@ -603,7 +619,7 @@ export default function App() {
           </header>
         )}
         {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} />}
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} />
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} onEntranceReveal={() => setMetricsHidden(false)} />
         {halloween && <HalloweenDecor />}
         {onResult && (
           <Toolbar
@@ -618,7 +634,11 @@ export default function App() {
             onFromAuto={onFromAuto}
           />
         )}
-        {screen === 'result' || screen === 'report' ? (
+        {waitingForNumbers ? (
+          <div className="chip" data-testid="chip-pending" role="status">
+            Fitting the boxes…
+          </div>
+        ) : screen === 'result' || screen === 'report' ? (
           <div className={layout.unplacedCount > 0 ? 'chip warn' : 'chip'} data-testid="chip">
             <b>{layout.placedCount.toLocaleString('en-US')}</b> placed · {layout.usedPct.toFixed(1)}% used
             {layout.unplacedCount > 0 && <> · {layout.unplacedCount.toLocaleString('en-US')} left out</>}
@@ -751,16 +771,22 @@ export default function App() {
             </div>
             <div id="screen-result" hidden={screen !== 'result'} className="resultpane">
               <h2 className="steptitle">Result</h2>
-              <Results
-                layout={layout}
-                unit={unit}
-                stale={stale && !manual}
-                showOrientation={!manual}
-                weight={weight}
-                weightUnit={wUnit}
-                heldBack={heldBack}
-                effortNotes={effortNotes}
-              />
+              {waitingForNumbers ? (
+                <p className="hint pending" role="status" data-testid="results-pending">
+                  Fitting the boxes… the numbers appear when the lid is closed.
+                </p>
+              ) : (
+                <Results
+                  layout={layout}
+                  unit={unit}
+                  stale={stale && !manual}
+                  showOrientation={!manual}
+                  weight={weight}
+                  weightUnit={wUnit}
+                  heldBack={heldBack}
+                  effortNotes={effortNotes}
+                />
+              )}
               <p className="hint">{manual ? 'Manual arrangement: these numbers follow the boxes you place.' : 'Automatic arrangement for the chosen box.'}</p>
               {manual && <ManualBoxes rows={rows} summaries={summaries} canAdd={canAdd} onAddBox={onAddBox} />}
             </div>

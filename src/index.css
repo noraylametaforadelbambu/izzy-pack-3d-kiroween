@@ -1561,3 +1561,10 @@ input.bad {
   width: 26px;
   height: 26px;
 }
+
+/* Result numbers wait for the entrance animation of the sample order */
+.hint.pending {
+  margin: 8px 0;
+  padding: 18px 0;
+  font-size: 0.9rem;
+}

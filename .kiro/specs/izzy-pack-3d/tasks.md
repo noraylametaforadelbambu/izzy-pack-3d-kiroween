@@ -96,6 +96,8 @@
 - [x] 36. Translucent schematic lid with a zipper seam and one soft bolt, then the lid lifts and fades (`viewer/lid.ts`). _R21.1, R21.2_
 - [x] 37. Checked in Chromium with WebGL 2 on 390×844 and 1280×900: phases pieces, lid, zip, bolt, hold, leave; 26/26, 0 left out, 50.8 %, 5.24 kg and the pictograms are right during and after; no replay on Back, report or Manual; ordinary orders have no entrance; no console errors. README test count: 354. _R21.5_
 
+- [x] 38. Result: the placement metrics wait for the seam and the bolt (sample only), then show the real values; the stale "Sample order loaded" message is removed when a box is confirmed; no delay for reduced motion or ordinary orders. Checked on 390×844 and 1280×900 with Back mid-animation. _R21.5_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).
