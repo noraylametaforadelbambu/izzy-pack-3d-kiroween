@@ -14,10 +14,15 @@ interface Props {
   halloween: boolean
   /** Pictogram of each product type that has one (the sample order). Empty for ordinary orders. */
   pictograms: Readonly<Record<string, PictogramKind>>
+  /**
+   * Token of an entrance animation to play once (the sample order after "Use this box"). A new token plays it again;
+   * the same token never does, and leaving the Result screen (null) cuts it short with the boxes in place.
+   */
+  entrance?: number | null
 }
 
 export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewerView(
-  { layout, interaction, halloween, pictograms },
+  { layout, interaction, halloween, pictograms, entrance = null },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null)
@@ -47,6 +52,15 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
   useEffect(() => {
     viewer.current?.setHalloween(halloween)
   }, [halloween])
+
+  // After the layout effect above, so the boxes are the new ones when the entrance starts.
+  const played = useRef<number | null>(null)
+  useEffect(() => {
+    if (entrance === null || entrance === played.current) return
+    played.current = entrance
+    viewer.current?.playEntrance()
+    return () => viewer.current?.endEntrance()
+  }, [entrance])
 
   useEffect(() => {
     viewer.current?.setInteraction(interaction)

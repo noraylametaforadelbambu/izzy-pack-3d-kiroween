@@ -33,6 +33,8 @@ import type { PictogramKind } from '../core/pictogram'
 import { planDecals } from './decals'
 import { DEFAULT_SCENE, HALLOWEEN_SCENE, halloweenColor } from './halloween'
 import { drawPictogram } from './pictograms'
+import { EntranceLid } from './lid'
+import { BOLT_START, BOLT_TIME, DROP_SHARE, FLASH_PEAK, LAND_TIME, LEAVE_START, TOTAL_TIME, ZIP_START, flashAmount, hasStarted, landingOrder, pieceProgress, remaining } from './entrance'
 
 /** Longest box side in scene units. Keeps the camera framing independent of mm / in. */
 const SCENE_SIZE = 10
@@ -111,6 +113,23 @@ class Marker {
   }
 }
 
+/** The sample order dropping into place (see `playEntrance`). Everything needed to put the boxes back exactly. */
+interface Entrance {
+  startedAt: number
+  /** Place of each box in the landing order. */
+  rank: number[]
+  /** Final matrices of the boxes, of each pictogram mesh, and the final outline vertices. */
+  boxes: Float32Array
+  decals: Float32Array[]
+  outline: Float32Array | null
+  drop: number
+}
+
+/** Out of sight: farther than the camera can see. */
+const HIDDEN = 10000
+/** Vertices per outlined box (the 12 edges of a cube). */
+const EDGE_VERTS = 24
+
 export class PackViewer {
   private renderer: WebGLRenderer
   private scene = new Scene()
@@ -130,6 +149,11 @@ export class PackViewer {
   /** One material (and so one texture) per pictogram kind, created on first use and reused by every box of that kind. */
   private decalMaterials = new Map<PictogramKind, MeshBasicMaterial>()
   private lastDrawCalls = -1
+  private outlineGeo: BufferGeometry | null = null
+  private decalSets: { mesh: InstancedMesh; boxIdx: number[] }[] = []
+  private entrance: Entrance | null = null
+  private lid: EntranceLid | null = null
+  private entrancePlays = 0
   /** Position of each product type in the list, used by the Halloween palette. */
   private typeIndex = new Map<string, number>()
   private dims = { k: 1, bx: 1, by: 1, bz: 1, h: 1 }
@@ -318,6 +342,7 @@ export class PackViewer {
    * y as up, so this is the single place where width and height are swapped.
    */
   setLayout(layout: Layout, pictograms?: Readonly<Record<string, PictogramKind>>): void {
+    this.endEntrance() // a new layout cancels an entrance in progress
     this.clear()
     const { box } = layout
     this.renderer.domElement.setAttribute('aria-label', `3D view: ${layout.placedCount} ${layout.placedCount === 1 ? 'box' : 'boxes'} placed in a container of ${box.l} × ${box.w} × ${box.h} mm. Drag to rotate, scroll to zoom.`)
@@ -383,6 +408,7 @@ export class PackViewer {
       if (outline.length > 0) {
         const g = new BufferGeometry()
         g.setAttribute('position', new Float32BufferAttribute(outline, 3))
+        this.outlineGeo = g
         this.content.add(
           new LineSegments(g, this.outlineMaterial),
         )
@@ -450,6 +476,7 @@ export class PackViewer {
         mesh.frustumCulled = false
         mesh.renderOrder = 4 // after the boxes, whose depth keeps hidden pictograms hidden
         this.content.add(mesh)
+        this.decalSets.push({ mesh, boxIdx: ds.map((d) => d.index) })
         counts[kind] = ds.length
       }
     }
@@ -517,6 +544,7 @@ export class PackViewer {
   }
 
   dispose(): void {
+    this.endEntrance()
     this.endGesture()
     this.container.removeEventListener('pointerdown', this.onPointerDown, true)
     this.selection.dispose()
@@ -537,6 +565,8 @@ export class PackViewer {
 
   private clear(): void {
     this.mesh = null
+    this.outlineGeo = null
+    this.decalSets = []
     for (const obj of [...this.content.children]) {
       this.content.remove(obj)
       obj.traverse((o) => {
@@ -557,8 +587,114 @@ export class PackViewer {
     this.camera.updateProjectionMatrix()
   }
 
+  // ---- Entrance of the sample order -------------------------------------------------------------
+
+  /**
+   * Drops the boxes of the current layout into their real positions, bottom layer first, then a discreet flash (about
+   * 1.3 s), then a schematic translucent lid with a zipper seam comes down, one soft bolt strikes it and the lid lifts away and
+   * fades (3.5 s in all, once per call). Only the drawing changes: the layout, the camera and the pictograms are untouched, and every
+   * box ends exactly where it was. Does nothing with `prefers-reduced-motion` or an empty layout. Returns whether it started.
+   */
+  playEntrance(): boolean {
+    this.endEntrance()
+    const mesh = this.mesh
+    const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!mesh || this.list.length === 0 || reduced) {
+      this.container.dataset.entrance = 'skipped'
+      return false
+    }
+    mesh.computeBoundingSphere() // with the final positions, before any box is moved out of place
+    const order = landingOrder(this.list)
+    const rank = new Array<number>(this.list.length)
+    order.forEach((boxIndex, r) => (rank[boxIndex] = r))
+    const outline = this.outlineGeo && this.outlineGeo.getAttribute('position').count === this.list.length * EDGE_VERTS ? Float32Array.from(this.outlineGeo.getAttribute('position').array) : null
+    this.entrance = {
+      startedAt: performance.now(),
+      rank,
+      boxes: Float32Array.from(mesh.instanceMatrix.array),
+      decals: this.decalSets.map((d) => Float32Array.from(d.mesh.instanceMatrix.array)),
+      outline,
+      drop: this.dims.by * DROP_SHARE,
+    }
+    this.entrancePlays++
+    this.container.dataset.entrancePlays = String(this.entrancePlays)
+    this.container.dataset.entrance = 'playing'
+    this.lid = new EntranceLid(this.dims.bx, this.dims.by, this.dims.bz)
+    this.content.add(this.lid.group)
+    this.stepEntrance(0)
+    return true
+  }
+
+  /** Draws the entrance at `time` seconds. */
+  private stepEntrance(time: number): void {
+    const e = this.entrance
+    const mesh = this.mesh
+    if (!e || !mesh) return
+    const n = this.list.length
+    const offset = new Float32Array(n)
+    for (let i = 0; i < n; i++) offset[i] = hasStarted(e.rank[i], n, time) ? e.drop * remaining(pieceProgress(e.rank[i], n, time)) : HIDDEN
+    const boxes = mesh.instanceMatrix.array as Float32Array
+    boxes.set(e.boxes)
+    for (let i = 0; i < n; i++) boxes[i * 16 + 13] += offset[i]
+    mesh.instanceMatrix.needsUpdate = true
+    this.decalSets.forEach((d, k) => {
+      const a = d.mesh.instanceMatrix.array as Float32Array
+      a.set(e.decals[k])
+      d.boxIdx.forEach((boxIndex, i) => (a[i * 16 + 13] += offset[boxIndex]))
+      d.mesh.instanceMatrix.needsUpdate = true
+    })
+    if (e.outline && this.outlineGeo) {
+      const attr = this.outlineGeo.getAttribute('position')
+      const a = attr.array as Float32Array
+      a.set(e.outline)
+      for (let i = 0; i < n; i++) for (let v = 0; v < EDGE_VERTS; v++) a[(i * EDGE_VERTS + v) * 3 + 1] += offset[i]
+      attr.needsUpdate = true
+    }
+    this.lid?.update(time)
+    // Test hooks: which part of the entrance is on screen, and whether the lid and the bolt have been shown.
+    const phase = time < LAND_TIME ? 'pieces' : time < ZIP_START ? 'lid' : time < BOLT_START ? 'zip' : time < BOLT_START + BOLT_TIME ? 'bolt' : time < LEAVE_START ? 'hold' : 'leave'
+    this.container.dataset.entrancePhase = phase
+    if (phase !== 'pieces') this.container.dataset.lidShown = '1'
+    if (phase === 'bolt') this.container.dataset.boltShown = '1'
+    const f = flashAmount(time)
+    this.itemMaterial.emissive.set(f > 0 ? 0xcdb8ff : 0x000000)
+    this.itemMaterial.emissiveIntensity = FLASH_PEAK * f
+  }
+
+  /** Puts everything back exactly where the layout has it and stops the entrance (also when it is cut short). */
+  endEntrance(): void {
+    const e = this.entrance
+    if (!e) return
+    this.entrance = null
+    const mesh = this.mesh
+    if (mesh) {
+      ;(mesh.instanceMatrix.array as Float32Array).set(e.boxes)
+      mesh.instanceMatrix.needsUpdate = true
+    }
+    this.decalSets.forEach((d, k) => {
+      ;(d.mesh.instanceMatrix.array as Float32Array).set(e.decals[k])
+      d.mesh.instanceMatrix.needsUpdate = true
+    })
+    if (e.outline && this.outlineGeo) {
+      const attr = this.outlineGeo.getAttribute('position')
+      ;(attr.array as Float32Array).set(e.outline)
+      attr.needsUpdate = true
+    }
+    this.lid?.dispose()
+    this.lid = null
+    this.itemMaterial.emissive.set(0x000000)
+    this.itemMaterial.emissiveIntensity = 1
+    this.container.dataset.entrance = 'done'
+    this.container.dataset.entrancePhase = 'none'
+  }
+
   private loop = (): void => {
     this.frame = requestAnimationFrame(this.loop)
+    if (this.entrance) {
+      const t = (performance.now() - this.entrance.startedAt) / 1000
+      if (t >= TOTAL_TIME) this.endEntrance()
+      else this.stepEntrance(Math.min(t, TOTAL_TIME))
+    }
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
     const calls = this.renderer.info.render.calls

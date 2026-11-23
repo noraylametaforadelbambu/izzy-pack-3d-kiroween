@@ -34,7 +34,7 @@ The optimizer makes no optimality claim; it keeps the best valid candidate it fi
 The project was built in **Kiro Web** sessions. What you can check in this repository:
 
 - **Specs**: `.kiro/specs/izzy-pack-3d/` has `requirements.md` (R1 to R17), `design.md` and `tasks.md`. Each feature (optimizer, weights, units, Web Worker, catalog, CSV and sections, sample order) was written down as numbered requirements first, then implemented against them. Tasks in `tasks.md` are checked only when done.
-- **Tests as acceptance checks**: the requirements' acceptance values (for example the 600 × 400 × 400 mm sample, exact fit, unit round trip) are unit tests. `npx vitest --run --dir src` runs 343 tests (1 skipped).
+- **Tests as acceptance checks**: the requirements' acceptance values (for example the 600 × 400 × 400 mm sample, exact fit, unit round trip) are unit tests. `npx vitest --run --dir src` runs 354 tests (1 skipped).
 - **History**: the commits are small and each message names one feature. Check them with `git log`.
 
 This project does not use Kiro hooks, steering files or MCP servers.
@@ -72,6 +72,8 @@ The app is a four-step guided flow, with the 3D view always next to the panel (o
 4. **Result**: the 3D view is the main thing, with the metrics (pieces placed and left out, volume, efficiency, weight). Main button: **View report**, a readable summary of the arrangement: box, pieces requested / placed / left out per product, volume, weight and notes. **Auto / Manual** is a secondary control above the 3D view.
 
 On a phone the 3D view is above the panel, so after **Use this box** or **Pack in my own box** the page scrolls up by itself and the 3D view is in sight when the Result opens (instantly if the system asks to reduce motion). On a wide screen nothing scrolls. **Back** and the step indicator keep everything you entered, the units, the recommendation and a result that is still valid. Changing the order, the weight limits or the container makes the result outdated: step 4 is disabled in the indicator, the view says "Previous result (outdated)", and a new result is made with **Use this box** or **Pack in my own box**. Changing a shipping box in the catalog clears the recommendation. Changing units never changes the result.
+
+When you confirm the **sample order** with **Use this box**, the 26 boxes drop into their real positions in the 3D view, bottom layer first (about 1.3 s). Then a schematic translucent lid comes down over the container, its zipper seam closes, one single soft bolt strikes the seam (one smooth pulse of about half a second, never a flicker), and the lid lifts away and fades so you can inspect the boxes (about 3.5 s in all). It plays once per confirmation; going back, opening the report, Auto / Manual and ordinary orders do not replay it, and leaving the Result screen cuts it short with the boxes in place. With the system setting *reduce motion* there is no animation, no lid and no bolt. It only changes how the view is drawn: the numbers (26 of 26 placed, 0 left out, 5.24 kg), the report, the camera and the pictograms are the real ones from the start. Code: `src/viewer/entrance.ts` (timing), `src/viewer/lid.ts` (lid, zipper, bolt) and `PackViewer.playEntrance`.
 
 In the sample, each box carries a pictogram (skull, black candle or jack-o’-lantern) on an exposed face, drawn once per product type. **Halloween mode** is available on every screen.
 

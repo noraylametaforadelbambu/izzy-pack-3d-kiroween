@@ -90,6 +90,12 @@
 
 - [x] 34. After Use this box / Pack in my own box, scroll the 3D view into sight on phones (390 px), none on desktop. Checked from the bottom button with the sample order: 26/26, 50.8 %, 5.24 kg; with and without reduced motion. README test count corrected (343 tests, 1 skipped). _R19.7_
 
+## Entrance of the sample order
+
+- [x] 35. The 26 boxes drop into their real positions after Use this box (sample order only), once per confirmation, cleaned up on leaving; reduced motion skips it. Timing tested in `viewer/entrance.test.ts`. _R21.1, R21.3, R21.4_
+- [x] 36. Translucent schematic lid with a zipper seam and one soft bolt, then the lid lifts and fades (`viewer/lid.ts`). _R21.1, R21.2_
+- [x] 37. Checked in Chromium with WebGL 2 on 390×844 and 1280×900: phases pieces, lid, zip, bolt, hold, leave; 26/26, 0 left out, 50.8 %, 5.24 kg and the pictograms are right during and after; no replay on Back, report or Manual; ordinary orders have no entrance; no console errors. README test count: 354. _R21.5_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

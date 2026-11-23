@@ -120,6 +120,8 @@ export default function App() {
   const [screen, setScreen] = useState<StepId>('home')
   // True once a result was made for the user's order (Use this box / Pack in my own box). Until then the view shows the example layout.
   const [produced, setProduced] = useState(false)
+  // Token of the entrance animation of the sample order: a new one per "Use this box" on the sample (never for ordinary orders).
+  const [entrance, setEntrance] = useState(0)
   const [csv, setCsv] = useState<CsvState | null>(null)
   const [confirmSample, setConfirmSample] = useState(false)
   // The order the app starts with: replacing it (or the untouched sample) needs no confirmation.
@@ -385,6 +387,7 @@ export default function App() {
     setSelectedId(null)
     setStale(false)
     setInvalid((s) => new Set([...s].filter((k) => !k.startsWith('box.'))))
+    if (Object.keys(snapshotPictograms(rows)).length > 0) setEntrance((n) => n + 1)
     startResult()
   }
 
@@ -600,7 +603,7 @@ export default function App() {
           </header>
         )}
         {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} />}
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} />
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} />
         {halloween && <HalloweenDecor />}
         {onResult && (
           <Toolbar

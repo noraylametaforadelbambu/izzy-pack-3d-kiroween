@@ -171,3 +171,11 @@ Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11)
 3. With `prefers-reduced-motion: reduce` the finished figure is drawn at once, nothing moves and there is no replay button.
 4. The scene is decorative and separate: its own renderer, scene and camera, no order data, no calculation. It does not change the Result screen, the navigation, the optimizer, the order viewer or Halloween mode. It takes no clicks and never covers a button: on wide screens the figure is framed in the space left of the panel, on phones the canvas sits above the buttons.
 5. The figure is readable on a phone (390 px wide) and on desktop. Its scene is removed when the user leaves Home, so no WebGL context stays open for it.
+
+### R21. Entrance of the sample order in Result
+1. After **Use this box** on the sample order (only an order whose products have a pictogram, never an ordinary order), the 3D view animates the entrance of the 26 boxes to their real positions, bottom layer first, in 1 to 2 seconds. Then, in sequence: a schematic translucent lid comes down over the container, its zipper seam closes, a single brief soft bolt strikes the seam, and the lid lifts and fades so the boxes can be inspected. The whole sequence lasts under 4 seconds.
+2. There is one bolt and no fast flashing: the bolt and the faint glow of the boxes are one smooth rise and fall of about half a second each. Nothing blinks.
+3. It plays once per confirmation. Back, the report, Auto / Manual, Halloween mode and the next screens do not replay it. Leaving Result, a new layout or a new confirmation cuts it short and leaves every box exactly in place, with the lid and bolt removed.
+4. With `prefers-reduced-motion: reduce` there is no animation, no lid and no bolt.
+5. It changes only how the view is drawn. The layout, the metrics (26 of 26 placed, 0 left out, 5.24 kg, 50.8 %), the report, Manual mode, the camera and the pictograms are unchanged and correct from the first frame.
+
