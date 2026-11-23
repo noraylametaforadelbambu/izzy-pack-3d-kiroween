@@ -23,6 +23,19 @@ export const BOLT_TIME = 0.45
 export const LEAVE_START = BOLT_START + BOLT_TIME + 0.1
 export const LID_LEAVE = 0.6
 export const TOTAL_TIME = LEAVE_START + LID_LEAVE
+/**
+ * Sound cues, as times on the same clock as the animation. The click of the zipper closing comes just as the pull reaches the
+ * end of the seam; the electric crackle comes as the bolt strikes (the bolt is rising, before its peak).
+ */
+export const ZIP_CUE = ZIP_START + ZIP_TIME * 0.92
+export const BOLT_CUE = BOLT_START + BOLT_TIME * 0.2
+export type EntranceCue = 'zip' | 'bolt' | 'end'
+/**
+ * Cues are sent this many seconds before their time, with the exact delay still to wait, so the sound is scheduled on the
+ * audio clock and lands on the right instant even when a frame is late.
+ */
+export const CUE_LOOKAHEAD = 0.1
+
 /** How translucent the lid is at most (0 = invisible, 1 = solid). */
 export const LID_OPACITY = 0.3
 /** How far above its seat the lid hovers when it arrives and leaves, as a share of the container height. */

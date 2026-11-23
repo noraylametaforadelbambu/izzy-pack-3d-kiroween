@@ -15,7 +15,8 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
-import { FRANK_COLORS, FRANK_PARTS, FRANK_PLATFORM, dropOffset, frankBounds, hasStarted, partProgress, totalDuration, twistAt, type FrankColor } from './frankenstein'
+import { CUE_LOOKAHEAD } from './entrance'
+import { FRANK_COLORS, FRANK_PARTS, FRANK_PLATFORM, dropOffset, frankBounds, frankSoundEvents, hasStarted, partProgress, totalDuration, twistAt, type FrankColor, type FrankSoundEvent } from './frankenstein'
 
 const EDGE_COLOR = 0xd8c9ff
 /** On wide screens the order panel covers the right side, so the figure is framed in the space left of it. */
@@ -43,6 +44,10 @@ export class FrankensteinScene {
   private time = totalDuration() + 1
   private startedAt = 0
   private container: HTMLElement
+  private events = frankSoundEvents()
+  private nextEvent = 0
+  /** Called at the real time of each landing group ('thud') and of the screws ('metal'), and with 'end' when it is cut short. */
+  onCue: ((e: FrankSoundEvent | 'end', delay: number) => void) | null = null
 
   constructor(container: HTMLElement, animate: boolean) {
     this.container = container
@@ -72,6 +77,7 @@ export class FrankensteinScene {
     }
 
     this.container.dataset.parts = String(FRANK_PARTS.length)
+    this.container.dataset.soundEvents = String(this.events.length)
     this.container.dataset.plays = '0'
     this.observer = new ResizeObserver(() => this.resize())
     this.observer.observe(container)
@@ -101,6 +107,8 @@ export class FrankensteinScene {
   play(): void {
     if (this.disposed) return
     cancelAnimationFrame(this.raf)
+    if (this.nextEvent > 0 && this.nextEvent < this.events.length) this.onCue?.('end', 0) // a replay cuts the sounds of the one in progress
+    this.nextEvent = 0
     this.plays++
     this.container.dataset.plays = String(this.plays)
     this.container.dataset.state = 'playing'
@@ -110,11 +118,20 @@ export class FrankensteinScene {
     const tick = (): void => {
       if (this.disposed) return
       this.time = (performance.now() - this.startedAt) / 1000
+      this.fireCues(this.time)
       if (this.time >= totalDuration()) return this.finish('done')
       this.draw()
       this.raf = requestAnimationFrame(tick)
     }
     this.raf = requestAnimationFrame(tick)
+  }
+
+  /** Fires, once each and in order, the sound events whose time has come on the animation's own clock. */
+  private fireCues(time: number): void {
+    while (this.nextEvent < this.events.length && this.events[this.nextEvent].time - CUE_LOOKAHEAD <= time) {
+      const e = this.events[this.nextEvent++]
+      this.onCue?.(e, Math.max(0, e.time - time)) // sent slightly early, with the delay still to wait
+    }
   }
 
   /** Shows the finished figure and stops drawing until the size changes. */
@@ -183,6 +200,8 @@ export class FrankensteinScene {
   }
 
   dispose(): void {
+    if (this.nextEvent > 0 && this.nextEvent < this.events.length) this.onCue?.('end', 0) // leaving Home cuts the sounds
+    this.onCue = null
     this.disposed = true
     cancelAnimationFrame(this.raf)
     this.observer.disconnect()

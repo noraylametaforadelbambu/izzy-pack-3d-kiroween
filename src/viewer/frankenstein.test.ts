@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   DROP_HEIGHT,
+  DROP_TIME,
   FRANK_COLORS,
   FRANK_PARTS,
   FRANK_PLATFORM,
+  FIRST_IMPACT,
+  GROUP_WINDOW,
+  frankSoundEvents,
+  impactTime,
   STAGGER,
   dropOffset,
   easeOutBounce,
@@ -98,3 +103,37 @@ describe('Frankenstein timing', () => {
     expect(Math.abs(twistAt(5, 0))).toBeLessThanOrEqual(0.5)
   })
 })
+
+describe('Frankenstein sound events', () => {
+  const events = frankSoundEvents()
+  it('a part first touches its place when its bounce first reaches 1', () => {
+    expect(easeOutBounce(FIRST_IMPACT)).toBeCloseTo(1, 6)
+    expect(easeOutBounce(FIRST_IMPACT - 0.01)).toBeLessThan(1)
+    expect(impactTime(0)).toBeCloseTo(DROP_TIME * FIRST_IMPACT, 9)
+    expect(impactTime(10) - impactTime(9)).toBeCloseTo(STAGGER, 9)
+  })
+  it('simultaneous impacts are grouped: far fewer sounds than parts, heavier when more parts land together', () => {
+    const thuds = events.filter((e) => e.kind === 'thud')
+    expect(thuds.length).toBeLessThan(FRANK_PARTS.length / 2)
+    expect(thuds.length).toBeGreaterThanOrEqual(8)
+    expect(thuds.every((e) => e.strength >= 0.3 && e.strength <= 1)).toBe(true)
+    expect(Math.max(...thuds.map((e) => e.strength))).toBeGreaterThan(Math.min(...thuds.map((e) => e.strength)))
+    for (let i = 1; i < thuds.length; i++) expect(thuds[i].time - thuds[i - 1].time).toBeGreaterThan(GROUP_WINDOW / 2)
+  })
+  it('there is exactly one metallic click, last, when the last temple screw lands', () => {
+    const metal = events.filter((e) => e.kind === 'metal')
+    expect(metal.length).toBe(1)
+    expect(events[events.length - 1]).toEqual(metal[0])
+    expect(metal[0].time).toBeCloseTo(impactTime(FRANK_PARTS.length - 1), 9)
+    const screws = FRANK_PARTS.filter((p) => p.late).length
+    expect(screws).toBe(6)
+    // the screws do not thud: the thuds cover only the other parts
+    const lastThud = events.filter((e) => e.kind === 'thud').pop()!
+    expect(lastThud.time).toBeLessThan(impactTime(FRANK_PARTS.length - screws - 1) + GROUP_WINDOW)
+  })
+  it('every sound happens inside the animation, in order', () => {
+    expect(events.every((e) => e.time > 0 && e.time < totalDuration())).toBe(true)
+    expect(events.map((e) => e.time)).toEqual([...events.map((e) => e.time)].sort((a, b) => a - b))
+  })
+})
+

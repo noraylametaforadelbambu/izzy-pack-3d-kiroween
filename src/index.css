@@ -1568,3 +1568,71 @@ input.bad {
   padding: 18px 0;
   font-size: 0.9rem;
 }
+
+/* Sound and Halloween mode: one row at the top right of the view */
+.stagebtns {
+  position: absolute;
+  top: 16px;
+  right: 64px;
+  z-index: 3;
+  display: flex;
+  gap: 8px;
+}
+.stagebtns .hwtoggle {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.soundbtn {
+  padding: 0 12px;
+}
+.soundbtn.on::before {
+  display: none; /* the speaker icon changes instead of the dot */
+}
+@media (max-width: 767px) {
+  .stagebtns {
+    top: 10px;
+    right: 56px;
+    gap: 6px;
+  }
+  .stagebtns .hwtoggle {
+    height: 40px;
+  }
+  .soundbtn {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .sndlabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@media (max-width: 430px) {
+  .stagebtns .hwtoggle:not(.soundbtn) {
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+  .hero h1 {
+    font-size: 1.45rem;
+  }
+}
+@media (max-width: 380px) {
+  .hero h1 {
+    font-size: 1.2rem;
+  }
+}
+@media (max-width: 340px) {
+  .hero {
+    padding-top: 56px; /* very narrow: the title goes below the button row */
+  }
+  .hero h1 {
+    font-size: 1.45rem;
+  }
+}

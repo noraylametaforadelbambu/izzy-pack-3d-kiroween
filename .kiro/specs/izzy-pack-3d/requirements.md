@@ -180,3 +180,12 @@ Delivered after Phase 3: weights (R9), cm and lb (R10), large mixed orders (R11)
 5. While the sequence runs, both placement metrics (the pill over the view and the numbers in the Result panel) are replaced by a short "Fitting the boxes…" message and show the real values (26 of 26 placed, 0 left out, 5.24 kg, 50.8 %) as soon as the zipper seam and the bolt are done. If the entrance ends early (Back, report, a new layout) they appear at once. With `prefers-reduced-motion`, for ordinary orders and for "Pack in my own box" they are shown from the first frame, with no delay. Confirming a box also removes the "Sample order loaded" message, which belongs to the previous screen.
 6. It changes only how the view is drawn. The layout, the metrics (26 of 26 placed, 0 left out, 5.24 kg, 50.8 %), the report, Manual mode, the camera and the pictograms are unchanged and correct from the first frame.
 
+### R22. Sound
+1. A **Sound** button sits next to **Halloween mode** on every screen. It is a toggle (`aria-pressed`, keyboard and touch), at least 40 × 40 px, and is off at start-up. Its state is not saved. On phones it shows only the speaker icon (the name "Sound" stays for assistive technology) and the title and buttons do not overlap down to 320 px.
+2. With Sound on, the animations have sound synthesized with the Web Audio API (no external files). Home: a soft thud as the boxes of the monster land, with simultaneous impacts grouped into one (heavier) thud, and a short metallic click when the temple screws go in. Result (sample order): a soft click as the zipper closes and a brief electric crackle with the single bolt. All sounds are quiet and short.
+3. Sounds are scheduled on the audio clock from the animation's own timeline (cues are sent a tenth of a second early with the exact delay), so they are in sync even when a frame is late.
+4. Audio is unlocked by a user gesture: the Sound button, the Replay button and the click that confirms the box. Turning Sound on makes no sound by itself; Replay then plays the Home animation with sound.
+5. Turning Sound off, leaving Home or Result, pressing Back or Replay in the middle of an animation, or cutting an animation short silences everything at once; a cut-short animation plays none of its remaining sounds.
+6. With `prefers-reduced-motion` there is no animation and so no sound. With Sound off nothing is played and no audio context is created.
+7. Sound never changes the layout, the numbers, the report or the navigation.
+

@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import type { Layout } from '../core/layout'
 import type { PictogramKind } from '../core/pictogram'
+import type { EntranceCue } from './entrance'
 import { PackViewer, type Interaction } from './PackViewer'
 
 export interface ViewerHandle {
@@ -21,10 +22,12 @@ interface Props {
   entrance?: number | null
   /** Called once per entrance when its seam and bolt are done, or when it ends early or does not run (reduced motion). */
   onEntranceReveal?: () => void
+  /** Sound cues of the entrance, on the animation's own clock: 'zip', 'bolt', and 'end' when it stops. */
+  onEntranceCue?: (c: EntranceCue, delay: number) => void
 }
 
 export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewerView(
-  { layout, interaction, halloween, pictograms, entrance = null, onEntranceReveal },
+  { layout, interaction, halloween, pictograms, entrance = null, onEntranceReveal, onEntranceCue },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null)
@@ -59,10 +62,15 @@ export const PackViewerView = forwardRef<ViewerHandle, Props>(function PackViewe
   const played = useRef<number | null>(null)
   const reveal = useRef(onEntranceReveal)
   reveal.current = onEntranceReveal
+  const cue = useRef(onEntranceCue)
+  cue.current = onEntranceCue
   useEffect(() => {
     if (entrance === null || entrance === played.current) return
     played.current = entrance
-    viewer.current?.playEntrance(() => reveal.current?.())
+    viewer.current?.playEntrance(
+      () => reveal.current?.(),
+      (c, delay) => cue.current?.(c, delay),
+    )
     return () => viewer.current?.endEntrance()
   }, [entrance])
 

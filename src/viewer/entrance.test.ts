@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BOLT_CUE,
   BOLT_START,
+  CUE_LOOKAHEAD,
   BOLT_TIME,
   FLASH_PEAK,
   LAND_TIME,
@@ -12,6 +14,7 @@ import {
   PIECE_TIME,
   STAGGER_SPAN,
   TOTAL_TIME,
+  ZIP_CUE,
   ZIP_START,
   ZIP_TIME,
   boltAmount,
@@ -135,3 +138,30 @@ describe('lid, zipper and bolt', () => {
     expect(FLASH_PEAK).toBeLessThanOrEqual(0.3)
   })
 })
+
+describe('sound cues', () => {
+  it('the zipper click comes as the seam closes, just before the bolt window', () => {
+    expect(ZIP_CUE).toBeGreaterThan(ZIP_START + ZIP_TIME * 0.8)
+    expect(ZIP_CUE).toBeLessThanOrEqual(BOLT_START)
+    expect(lidState(ZIP_CUE).zip).toBeGreaterThan(0.95)
+  })
+  it('the crackle comes as the bolt strikes: inside its window, while it is still rising', () => {
+    expect(BOLT_CUE).toBeGreaterThan(BOLT_START)
+    expect(BOLT_CUE).toBeLessThan(BOLT_START + BOLT_TIME / 2)
+    expect(boltAmount(BOLT_CUE)).toBeGreaterThan(0.2)
+    expect(boltAmount(BOLT_CUE)).toBeLessThan(0.6)
+  })
+  it('the two sounds are distinct (at least 100 ms apart) and both happen before the lid leaves', () => {
+    expect(BOLT_CUE - ZIP_CUE).toBeGreaterThanOrEqual(0.1)
+    expect(BOLT_CUE).toBeLessThan(LEAVE_START)
+  })
+})
+
+describe('cue look-ahead', () => {
+  it('cues are sent a little early (under a quarter second) and never before the lid is there', () => {
+    expect(CUE_LOOKAHEAD).toBeGreaterThan(0.05)
+    expect(CUE_LOOKAHEAD).toBeLessThan(0.25)
+    expect(ZIP_CUE - CUE_LOOKAHEAD).toBeGreaterThan(ZIP_START)
+  })
+})
+

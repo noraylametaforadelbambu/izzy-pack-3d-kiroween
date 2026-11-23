@@ -149,3 +149,56 @@ export const hasStarted = (index: number, time: number): boolean => time >= inde
 /** Small, fixed twist (radians) a part has while falling, easing to 0 as it lands. */
 export const startTwist = (index: number): number => ((index * 37) % 11 - 5) * 0.09
 export const twistAt = (index: number, progress: number): number => startTwist(index) * (1 - Math.min(1, progress * 1.4)) ** 2
+
+// ---- Sound events ----------------------------------------------------------------------------------
+
+/** A part first touches its place when the bounce first reaches 1 (see `easeOutBounce`). */
+export const FIRST_IMPACT = 1 / 2.75
+/** Impacts closer together than this are one sound (a heavier thud), not a rattle. */
+export const GROUP_WINDOW = 0.15
+
+export type FrankSoundKind = 'thud' | 'metal'
+export interface FrankSoundEvent {
+  /** Seconds from the start of the animation. */
+  time: number
+  kind: FrankSoundKind
+  /** 0 to 1: how heavy the parts that hit together are (thud); always 1 for the metal click. */
+  strength: number
+}
+
+/** When part number `index` (in stacking order) first touches its place. */
+export const impactTime = (index: number): number => index * STAGGER + DROP_TIME * FIRST_IMPACT
+
+/**
+ * The sounds of the animation, on its own clock: one soft thud per group of parts that land together (impacts within
+ * `GROUP_WINDOW` of each other are merged, at their mean time, and sound heavier the bigger the parts are), and one metallic click
+ * when the last of the temple screws lands. The screws do not thud: they make the click.
+ */
+export function frankSoundEvents(parts: readonly FrankPart[] = FRANK_PARTS): FrankSoundEvent[] {
+  const events: FrankSoundEvent[] = []
+  let group: number[] = []
+  let volume = 0
+  const flush = (): void => {
+    if (group.length === 0) return
+    const time = group.reduce((a, b) => a + b, 0) / group.length
+    // Heavier (bigger, more) parts landing together make a heavier thud; never silent, never at full blast.
+    events.push({ time, kind: 'thud', strength: Math.min(1, 0.3 + (0.7 * Math.sqrt(volume)) / 3.5) })
+    group = []
+    volume = 0
+  }
+  let screwTime = -1
+  parts.forEach((p, i) => {
+    const t = impactTime(i)
+    if (p.late) {
+      screwTime = Math.max(screwTime, t)
+      return
+    }
+    if (group.length > 0 && t - group[0] > GROUP_WINDOW) flush()
+    group.push(t)
+    volume += p.size[0] * p.size[1] * p.size[2]
+  })
+  flush()
+  if (screwTime >= 0) events.push({ time: screwTime, kind: 'metal', strength: 1 })
+  return events.sort((a, b) => a.time - b.time)
+}
+

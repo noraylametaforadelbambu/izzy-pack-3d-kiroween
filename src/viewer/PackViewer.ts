@@ -34,7 +34,7 @@ import { planDecals } from './decals'
 import { DEFAULT_SCENE, HALLOWEEN_SCENE, halloweenColor } from './halloween'
 import { drawPictogram } from './pictograms'
 import { EntranceLid } from './lid'
-import { BOLT_START, BOLT_TIME, DROP_SHARE, FLASH_PEAK, LAND_TIME, LEAVE_START, TOTAL_TIME, ZIP_START, flashAmount, hasStarted, landingOrder, pieceProgress, remaining } from './entrance'
+import { BOLT_CUE, BOLT_START, CUE_LOOKAHEAD, BOLT_TIME, DROP_SHARE, FLASH_PEAK, LAND_TIME, LEAVE_START, TOTAL_TIME, ZIP_CUE, ZIP_START, type EntranceCue, flashAmount, hasStarted, landingOrder, pieceProgress, remaining } from './entrance'
 
 /** Longest box side in scene units. Keeps the camera framing independent of mm / in. */
 const SCENE_SIZE = 10
@@ -125,6 +125,10 @@ interface Entrance {
   drop: number
   /** Called once, when the seam and the bolt are done (or at once if the entrance ends early): the numbers may be shown. */
   reveal: (() => void) | null
+  /** Sound cues, fired once each on the animation's own clock ('end' when it stops for any reason). */
+  cue: ((c: EntranceCue, delay: number) => void) | null
+  zipCued: boolean
+  boltCued: boolean
 }
 
 /** Out of sight: farther than the camera can see. */
@@ -597,7 +601,7 @@ export class PackViewer {
    * fades (3.5 s in all, once per call). Only the drawing changes: the layout, the camera and the pictograms are untouched, and every
    * box ends exactly where it was. Does nothing with `prefers-reduced-motion` or an empty layout. Returns whether it started.
    */
-  playEntrance(onReveal?: () => void): boolean {
+  playEntrance(onReveal?: () => void, onCue?: (c: EntranceCue, delay: number) => void): boolean {
     this.endEntrance()
     const mesh = this.mesh
     const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -619,6 +623,9 @@ export class PackViewer {
       outline,
       drop: this.dims.by * DROP_SHARE,
       reveal: onReveal ?? null,
+      cue: onCue ?? null,
+      zipCued: false,
+      boltCued: false,
     }
     this.entrancePlays++
     this.container.dataset.entrancePlays = String(this.entrancePlays)
@@ -656,6 +663,14 @@ export class PackViewer {
     }
     this.lid?.update(time)
     if (time >= LEAVE_START) this.revealNumbers(e)
+    if (!e.zipCued && time >= ZIP_CUE - CUE_LOOKAHEAD) {
+      e.zipCued = true
+      e.cue?.('zip', Math.max(0, ZIP_CUE - time))
+    }
+    if (!e.boltCued && time >= BOLT_CUE - CUE_LOOKAHEAD) {
+      e.boltCued = true
+      e.cue?.('bolt', Math.max(0, BOLT_CUE - time))
+    }
     // Test hooks: which part of the entrance is on screen, and whether the lid and the bolt have been shown.
     const phase = time < LAND_TIME ? 'pieces' : time < ZIP_START ? 'lid' : time < BOLT_START ? 'zip' : time < BOLT_START + BOLT_TIME ? 'bolt' : time < LEAVE_START ? 'hold' : 'leave'
     this.container.dataset.entrancePhase = phase
@@ -679,6 +694,7 @@ export class PackViewer {
     if (!e) return
     this.entrance = null
     this.revealNumbers(e) // cut short or finished: the numbers are never left hidden
+    e.cue?.('end', 0) // and the sound stops with it
     const mesh = this.mesh
     if (mesh) {
       ;(mesh.instanceMatrix.array as Float32Array).set(e.boxes)

@@ -98,6 +98,12 @@
 
 - [x] 38. Result: the placement metrics wait for the seam and the bolt (sample only), then show the real values; the stale "Sample order loaded" message is removed when a box is confirmed; no delay for reduced motion or ordinary orders. Checked on 390×844 and 1280×900 with Back mid-animation. _R21.5_
 
+## Sound
+
+- [x] 39. Sound toggle next to Halloween mode (off by default, accessible, 40 px, no overlaps from 320 px to desktop). _R22.1_
+- [x] 40. Web Audio synthesis (`viewer/entranceSound.ts`): zipper click and bolt crackle in Result; grouped soft thuds and a metallic screw click on Home, replayable with Replay. Cues on the animation's own clock with look-ahead scheduling. _R22.2 to R22.4_
+- [x] 41. Silence on off, leave, Back, Replay and early end; none with reduced motion or with Sound off. Checked in Chromium with a recorder on the audio nodes, 390×844 and 1280×900: counts, order and timing of every sound, on/off, keyboard, reduced motion. README test count: 362. _R22.5 to R22.7_
+
 ## Not done
 
 - [ ] Orders that need several boxes, stacking-weight rules (heavy below light), saving the catalog. Out of scope so far (R9.7, R13.8, R16.5).

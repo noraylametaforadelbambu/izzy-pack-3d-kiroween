@@ -50,6 +50,9 @@ import { BoxesTab } from './ui/BoxesTab'
 import { CatalogPanel } from './ui/CatalogPanel'
 import { FrankensteinHome } from './ui/FrankensteinHome'
 import { HalloweenDecor } from './ui/HalloweenDecor'
+import { SoundToggle } from './ui/SoundToggle'
+import { EntranceSound } from './viewer/entranceSound'
+import type { FrankSoundEvent } from './viewer/frankenstein'
 import { ProductsTab, type CsvState } from './ui/ProductsTab'
 import { ManualBoxes } from './ui/ManualBoxes'
 import { ReportTab } from './ui/ReportTab'
@@ -130,6 +133,12 @@ export default function App() {
   const startSignature = useRef(orderSignature(sampleRows()))
   // Halloween mode: colors of the 3D view only. Off by default and not saved; nothing else reads it.
   const [halloween, setHalloween] = useState(false)
+  // Sound effects (Web Audio, synthesized): off at start and not saved. Audio can only start after a gesture, so the engine
+  // is created and unlocked by the Sound button (and resumed by the clicks that start an animation).
+  const [soundOn, setSoundOn] = useState(false)
+  const soundOnRef = useRef(false)
+  const audio = useRef<EntranceSound | null>(null)
+  const soundButton = useRef<HTMLDivElement>(null)
   const viewer = useRef<ViewerHandle>(null)
   const stage = useRef<HTMLElement>(null)
   const revealStage = useRef(false)
@@ -384,6 +393,7 @@ export default function App() {
   function onUseBox() {
     const r = rec?.recommendation
     if (!rec || !r || r.status !== 'found' || !r.box || !r.result) return
+    if (soundOnRef.current) unlockAudio() // this click is the gesture that lets the entrance be heard
     const dims = r.box.dims
     setBox(dimsToFields(dims, unit))
     setConfig({ box: dims, types: rec.types, weight: rec.spec, labels: snapshotLabels(rows), pictograms: snapshotPictograms(rows) })
@@ -550,6 +560,48 @@ export default function App() {
 
   const flagged = useMemo(() => new Set<StepId>([...invalid].map((k) => stepOfKey(k, rowIds))), [invalid, rowIds])
   const resultReady = produced && !stale
+
+  /** Sound button: the click is the gesture that unlocks audio. Turning it off silences everything at once. */
+  function onToggleSound() {
+    const next = !soundOnRef.current
+    soundOnRef.current = next
+    setSoundOn(next)
+    if (next) unlockAudio()
+    else audio.current?.silence()
+  }
+
+  /** Creates the engine on first use and resumes it. Call from a click or tap handler, and only while Sound is on. */
+  function unlockAudio() {
+    if (!audio.current) {
+      const a = new EntranceSound()
+      a.onEvent = (name) => {
+        const el = soundButton.current
+        if (el) el.dataset.log = `${el.dataset.log ?? ''}${el.dataset.log ? ',' : ''}${name}` // test hook: what was played
+      }
+      audio.current = a
+    }
+    audio.current.unlock()
+    if (soundButton.current) soundButton.current.dataset.audio = audio.current.state
+  }
+
+  /** The sounds of the Home animation: soft thuds as the boxes land, a metallic click with the screws. */
+  function onHomeCue(e: FrankSoundEvent | 'end', delay: number) {
+    const a = audio.current
+    if (!a || !soundOnRef.current) return
+    if (e === 'end') a.silence()
+    else if (e.kind === 'thud') a.thud(e.strength, delay)
+    else a.metalClick(delay)
+  }
+
+  /** The sounds of the Result entrance: the zipper click and the crackle of the single bolt. */
+  function onResultCue(c: 'zip' | 'bolt' | 'end', delay: number) {
+    const a = audio.current
+    if (!a || !soundOnRef.current) return
+    if (c === 'end') a.silence()
+    else if (c === 'zip') a.zipClick(delay)
+    else a.zap(delay)
+  }
+  useEffect(() => () => audio.current?.dispose(), [])
   const waitingForNumbers = metricsHidden && screen === 'result'
   // Safety net: the numbers are never hidden for more than a few seconds, whatever happens to the animation.
   useEffect(() => {
@@ -618,8 +670,8 @@ export default function App() {
             <p className="tagline">Find a shipping box for your order and see how to pack it in 3D.</p>
           </header>
         )}
-        {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} />}
-        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} onEntranceReveal={() => setMetricsHidden(false)} />
+        {screen === 'home' && <FrankensteinHome playOnMount={!frankPlayed} onPlayed={() => setFrankPlayed(true)} onCue={onHomeCue} onReplay={() => soundOnRef.current && unlockAudio()} />}
+        <PackViewerView ref={viewer} layout={layout} interaction={interaction} halloween={halloween} pictograms={config.pictograms} entrance={screen === 'result' && entrance > 0 ? entrance : null} onEntranceReveal={() => setMetricsHidden(false)} onEntranceCue={onResultCue} />
         {halloween && <HalloweenDecor />}
         {onResult && (
           <Toolbar
@@ -668,15 +720,18 @@ export default function App() {
             {notice.text}
           </div>
         )}
-        <button
-          type="button"
-          className={halloween ? 'hwtoggle on' : 'hwtoggle'}
-          aria-pressed={halloween}
-          title="Halloween mode: changes only the colors of the 3D view"
-          onClick={() => setHalloween((v) => !v)}
-        >
-          Halloween mode
-        </button>
+        <div className="stagebtns" ref={soundButton}>
+          <SoundToggle on={soundOn} onToggle={onToggleSound} />
+          <button
+            type="button"
+            className={halloween ? 'hwtoggle on' : 'hwtoggle'}
+            aria-pressed={halloween}
+            title="Halloween mode: changes only the colors of the 3D view"
+            onClick={() => setHalloween((v) => !v)}
+          >
+            Halloween mode
+          </button>
+        </div>
         <button
           type="button"
           className="reset"
